@@ -53,6 +53,12 @@ python detection/detect_motos_opencv.py
 python detection/yolov8_detect.py
 ```
 
+### Rastreamento com YOLOv8 + SORT
+```bash
+python detection/yolov8_tracking_sort.py --video assets/sample_video.mp4 --no-display --output tracking_data.csv
+```
+O parâmetro `--output` é opcional e permite salvar os dados de rastreamento em um arquivo CSV.
+
 ## 🤝 Contribuindo
 
 Contribuições são sempre bem-vindas! Aqui estão algumas maneiras de contribuir:
@@ -80,7 +86,9 @@ Contribuições são sempre bem-vindas! Aqui estão algumas maneiras de contribu
 visionmoto/
 ├── detection/
 │   ├── detect_motos_opencv.py
+│   ├── sort.py
 │   ├── yolov8_detect.py
+│   ├── yolov8_tracking_sort.py
 │   ├── MobileNetSSD_deploy.prototxt
 │   └── MobileNetSSD_deploy.caffemodel
 ├── assets/
