@@ -2,44 +2,85 @@ import cv2
 from ultralytics import YOLO
 from sort import Sort
 import numpy as np
+import argparse
+import csv
+import time
 
-model = YOLO('yolov8n.pt')
-video_path = 'assets/sample_video.mp4'
-cap = cv2.VideoCapture(video_path)
-tracker = Sort()
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+def main():
+    parser = argparse.ArgumentParser(description="Rastreamento de motos com YOLOv8 + SORT")
+    parser.add_argument("--video", default="assets/sample_video.mp4", help="Caminho para o arquivo de vídeo")
+    parser.add_argument("--output", help="Arquivo CSV para salvar os dados de rastreamento")
+    parser.add_argument("--no-display", action="store_true", help="Desabilita a exibição do vídeo")
+    parser.add_argument("--max-frames", type=int, default=None, help="Número máximo de frames a serem processados")
+    args = parser.parse_args()
 
-    results = model(frame)
-    detections = results[0].boxes
+    model = YOLO('yolov8n.pt')
+    cap = cv2.VideoCapture(args.video)
+    tracker = Sort()
 
-    dets = []
-    for box in detections:
-        cls = int(box.cls.item())
-        if cls == 3:  # classe 3 = "motorbike" em COCO
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
-            conf = box.conf.item()
-            dets.append([x1, y1, x2, y2, conf])
+    frame_num = 0
+    track_ids = set()
+    start_time = time.time()
 
-    dets_np = np.array(dets)
-    if len(dets_np) == 0:
-        tracks = np.empty((0, 5))
-    else:
-        tracks = tracker.update(dets_np)
+    csv_file = None
+    writer = None
+    if args.output:
+        csv_file = open(args.output, 'w', newline='')
+        writer = csv.writer(csv_file)
+        writer.writerow(['frame', 'track_id', 'x1', 'y1', 'x2', 'y2'])
 
-    for track in tracks:
-        if len(track) == 5:
-            x1, y1, x2, y2, track_id = track.astype(int)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-            cv2.putText(frame, f'ID {track_id}', (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame_num += 1
 
-    cv2.imshow("FleetZone - Rastreamento YOLOv8 + SORT", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
+        results = model(frame)
+        detections = results[0].boxes
 
-cap.release()
-cv2.destroyAllWindows()
+        dets = []
+        for box in detections:
+            cls = int(box.cls.item())
+            if cls == 3:  # classe 3 = "motorbike" em COCO
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                conf = box.conf.item()
+                dets.append([x1, y1, x2, y2, conf])
+
+        dets_np = np.array(dets)
+        if len(dets_np) == 0:
+            tracks = np.empty((0, 5))
+        else:
+            tracks = tracker.update(dets_np)
+
+        for track in tracks:
+            if len(track) == 5:
+                x1, y1, x2, y2, track_id = track.astype(int)
+                track_ids.add(int(track_id))
+                if writer:
+                    writer.writerow([frame_num, int(track_id), x1, y1, x2, y2])
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                cv2.putText(frame, f'ID {int(track_id)}', (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+
+        if not args.no_display:
+            cv2.imshow("FleetZone - Rastreamento YOLOv8 + SORT", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+
+        if args.max_frames and frame_num >= args.max_frames:
+            break
+
+    cap.release()
+    if not args.no_display:
+        cv2.destroyAllWindows()
+    if csv_file:
+        csv_file.close()
+    elapsed = time.time() - start_time
+    fps = frame_num / elapsed if elapsed > 0 else 0
+    print(f"Processadas {frame_num} frames em {elapsed:.2f}s ({fps:.2f} FPS)")
+    print(f"IDs únicos rastreados: {len(track_ids)}")
+
+
+if __name__ == "__main__":
+    main()
