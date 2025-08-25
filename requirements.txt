@@ -3,3 +3,6 @@ opencv-python
 numpy
 filterpy
 scipy
+flask
+flask-socketio
+requests

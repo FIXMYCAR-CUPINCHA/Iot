@@ -7,6 +7,8 @@
 
 VisionMoto é uma solução open source para detecção e rastreamento de motos utilizando visão computacional. O projeto implementa dois métodos diferentes de detecção: OpenCV com MobileNet SSD e YOLOv8, permitindo flexibilidade na escolha do método mais adequado para cada caso de uso.
 
+Este repositório também inclui um backend Flask com Socket.IO e um dashboard web para exibir métricas em tempo real, além de persistir os eventos de detecção em SQLite para análise posterior.
+
 ## ✨ Características
 
 - Detecção de motos em tempo real usando câmeras comuns
@@ -36,6 +38,25 @@ cd visionmoto
 pip install -r requirements.txt
 ```
 
+### Backend + Dashboard em tempo real
+
+1) Inicie o backend (Socket.IO + SQLite):
+```bash
+python backend/app.py
+```
+
+2) Acesse o dashboard no navegador: `http://localhost:5000/`
+
+3) Em outro terminal, execute o rastreamento que envia eventos ao backend:
+```bash
+python detection/yolov8_tracking_sort.py --video assets/sample_video.mp4
+```
+
+Opcional: limite de frames para teste rápido e sem janela:
+```bash
+python detection/yolov8_tracking_sort.py --video assets/sample_video.mp4 --no-display --max-frames 300
+```
+
 3. Baixe o modelo YOLOv8 (se for usar o detector YOLOv8):
 ```bash
 wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
@@ -58,6 +79,8 @@ python detection/yolov8_detect.py
 python detection/yolov8_tracking_sort.py --video assets/sample_video.mp4 --no-display --output tracking_data.csv
 ```
 O parâmetro `--output` é opcional e permite salvar os dados de rastreamento em um arquivo CSV.
+
+Ao utilizar o backend, os eventos também são enviados via HTTP para `http://localhost:5000/detections` e transmitidos em tempo real para o dashboard via Socket.IO. As métricas agregadas podem ser consultadas em `GET /metrics`.
 
 ## 🤝 Contribuindo
 

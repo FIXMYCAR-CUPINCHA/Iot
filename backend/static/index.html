@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FleetZone Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #0b1020; color: #e6ecff; }
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .card { background: #121a37; padding: 16px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+        .card h2 { margin: 0 0 8px 0; font-size: 16px; color: #9fb0ff; }
+        .value { font-size: 28px; font-weight: bold; }
+        #events { margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #243055; }
+        th { color: #9fb0ff; }
+        .live { width: 12px; height: 12px; background: #ff5252; border-radius: 50%; display: inline-block; margin-right: 6px; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+        .header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <span class="live"></span>
+        <h1>FleetZone • Visão Computacional em Tempo Real</h1>
+    </div>
+    <div class="cards">
+        <div class="card"><h2>Eventos</h2><div id="total" class="value">0</div></div>
+        <div class="card"><h2>IDs Únicos</h2><div id="unique" class="value">0</div></div>
+        <div class="card"><h2>FPS (média 60)</h2><div id="fps" class="value">0.0</div></div>
+    </div>
+
+    <div id="events" class="card">
+        <h2>Últimos eventos</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Frame</th>
+                    <th>Track ID</th>
+                    <th>BBox</th>
+                    <th>Count</th>
+                    <th>FPS</th>
+                </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" integrity="sha384-0kC8S16Zp4fH7P8eYjM5bJf0k4m1c3z7pEf/9YyiB+2kXoQhJqFz5O5o1sY5r8XO" crossorigin="anonymous"></script>
+    <script>
+        const totalEl = document.getElementById('total');
+        const uniqueEl = document.getElementById('unique');
+        const fpsEl = document.getElementById('fps');
+        const tbody = document.getElementById('tbody');
+
+        function refreshMetrics() {
+            fetch('/metrics').then(r => r.json()).then(m => {
+                totalEl.textContent = m.total_events;
+                uniqueEl.textContent = m.unique_tracks;
+                fpsEl.textContent = m.avg_fps_last_60.toFixed(2);
+            }).catch(() => {});
+        }
+
+        refreshMetrics();
+        setInterval(refreshMetrics, 2000);
+
+        const socket = io();
+        socket.on('connect', () => console.log('socket connected'));
+        socket.on('detection', (evt) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${new Date(evt.created_at).toLocaleTimeString()}</td>
+                <td>${evt.frame}</td>
+                <td>${evt.track_id}</td>
+                <td>[${evt.x1}, ${evt.y1}, ${evt.x2}, ${evt.y2}]</td>
+                <td>${evt.count}</td>
+                <td>${evt.fps?.toFixed ? evt.fps.toFixed(2) : evt.fps}</td>
+            `;
+            tbody.prepend(tr);
+            while (tbody.rows.length > 20) tbody.deleteRow(-1);
+        });
+    </script>
+</body>
+</html>
+
+
