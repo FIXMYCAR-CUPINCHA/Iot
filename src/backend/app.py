@@ -139,15 +139,7 @@ def detections():
          fps, total_detections, unique_motos, detection_rate)
     )
     
-    # Salva métricas agregadas a cada 10 detecções
-    if total_detections % 10 == 0:
-        cursor.execute(
-            '''INSERT INTO metrics 
-               (timestamp, total_detections, unique_motos, avg_fps, detection_rate, session_duration) 
-               VALUES (?, ?, ?, ?, ?, ?)''',
-            (created_at, total_detections, unique_motos, fps, detection_rate, 
-             metrics.get('elapsed_time', 0.0))
-        )
+    # Métricas são calculadas dinamicamente, não precisam ser salvas separadamente
     
     connection.commit()
     connection.close()
