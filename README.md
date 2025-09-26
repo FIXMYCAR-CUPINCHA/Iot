@@ -5,7 +5,6 @@ Sistema completo de detecção de motos em tempo real usando **Visão Computacio
 ## 🎯 Visão Geral
 
 O VisionMoto integra:
-- **Visão Computacional**: Detecção de motos usando YOLOv8
 - **IoT**: Simulação de sensores e atuadores para monitoramento
 - **Backend API**: Comunicação em tempo real via HTTP/REST
 - **Dashboard Web**: Interface visual com dados em tempo real
@@ -15,51 +14,23 @@ O VisionMoto integra:
 
 ### Sistema Completo (Recomendado)
 ```bash
-python run_complete_system.py
+python visionmoto.py demo
 ```
-
-### Componentes Individuais
+### Outras Opções
 ```bash
-# Apenas detecção de visão computacional
-python main.py
+# Demonstração final
+python visionmoto.py demo-final
+
+python visionmoto.py vision
 
 # Apenas backend API
-python -m src.backend.app
+python visionmoto.py backend
 
-# Apenas simulação IoT
-python -m src.iot.sensor_simulator
-```
+# Gerar relatório
+python visionmoto.py report
 
-## 📁 Estrutura do Projeto
-
-```
-VisionMoto/
-├── src/
-│   ├── detection/          # Detecção YOLOv8
-│   │   ├── moto_detector.py
-│   │   └── moto_detection_enhanced.py
-│   ├── backend/           # API REST Flask
-│   │   ├── app.py
-│   │   └── static/
-│   │       ├── index.html
-│   │       └── style.css
-│   ├── iot/               # Simulação IoT
-│   │   └── sensor_simulator.py
-│   ├── utils/             # Utilitários
-│   │   ├── database.py
-│   │   └── metrics.py
-│   └── tests/             # Testes
-├── assets/                # Vídeos de demonstração
-├── main.py               # Sistema principal
-├── run_complete_system.py # Sistema completo integrado
-├── requirements.txt      # Dependências
-└── README.md           # Este arquivo
-```
-
-## 🛠️ Tecnologias Utilizadas
-
-### Visão Computacional
-- **YOLOv8**: Detecção de objetos em tempo real
+# Ver todas as opções
+python visionmoto.py help
 - **OpenCV**: Processamento de vídeo
 - **Ultralytics**: Framework YOLO
 
