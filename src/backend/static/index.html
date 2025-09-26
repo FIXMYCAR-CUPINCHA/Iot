@@ -54,6 +54,7 @@
             font-weight: 300;
             background: linear-gradient(45deg, #9fb0ff, #ff5252);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         
@@ -356,6 +357,10 @@
                 .catch(error => console.error('Erro ao carregar dispositivos IoT:', error));
         }
         
+        // Variáveis para controle de paginação
+        let showAllDevices = false;
+        const maxDevicesShow = 6;
+        
         // Função para exibir dispositivos IoT
         function displayIoTDevices() {
             if (iotDevicesList.length === 0) {
@@ -366,10 +371,22 @@
             const sensors = iotDevicesList.filter(d => d.device_type === 'sensor');
             const actuators = iotDevicesList.filter(d => d.device_type === 'actuator');
             
-            let html = '<div style="margin-bottom: 15px;">';
-            html += '<h4 style="color: #9fb0ff; margin-bottom: 10px;">Sensores (' + sensors.length + ')</h4>';
+            // Limita dispositivos mostrados
+            const sensorsToShow = showAllDevices ? sensors : sensors.slice(0, maxDevicesShow);
+            const actuatorsToShow = showAllDevices ? actuators : actuators.slice(0, 3);
             
-            sensors.forEach(sensor => {
+            let html = '<div style="margin-bottom: 15px;">';
+            html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">`;
+            html += `<h4 style="color: #9fb0ff; margin: 0;">Sensores (${sensors.length})</h4>`;
+            
+            if (sensors.length > maxDevicesShow) {
+                html += `<button onclick="toggleDevicesView()" style="background: #4a5568; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer;">
+                    ${showAllDevices ? 'Ver Menos' : 'Ver Mais'}
+                </button>`;
+            }
+            html += '</div>';
+            
+            sensorsToShow.forEach(sensor => {
                 const statusClass = sensor.status === 'active' ? 'status-online' : 'status-offline';
                 const batteryClass = sensor.battery_level > 50 ? 'confidence-high' : 
                                    sensor.battery_level > 20 ? 'confidence-medium' : 'confidence-low';
@@ -385,6 +402,12 @@
                     </div>
                 `;
             });
+            
+            if (!showAllDevices && sensors.length > maxDevicesShow) {
+                html += `<div style="color: #8a9bb8; font-style: italic; text-align: center; padding: 8px;">
+                    ... e mais ${sensors.length - maxDevicesShow} sensores
+                </div>`;
+            }
             
             html += '</div>';
             
@@ -465,6 +488,12 @@
             while (detectionsTable.rows.length > 20) {
                 detectionsTable.deleteRow(-1);
             }
+        }
+        
+        // Função para alternar visualização de dispositivos
+        function toggleDevicesView() {
+            showAllDevices = !showAllDevices;
+            displayIoTDevices();
         }
         
         // Inicialização

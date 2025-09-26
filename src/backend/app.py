@@ -160,7 +160,7 @@ def detections():
     }
     
     # Emite evento em tempo real
-    socketio.emit('detection', event, broadcast=True)
+    socketio.emit('detection', event)
     
     # Verifica alertas
     check_alerts(class_id, confidence, total_detections, unique_motos)
@@ -172,19 +172,35 @@ def check_alerts(class_id, confidence, total_detections, unique_motos):
     alerts = []
     
     # Alerta para baixa confiança
-    if confidence < 0.3:
+    if confidence < 0.4:
         alerts.append({
             'type': 'low_confidence',
             'message': f'Detecção com baixa confiança: {confidence:.2f}',
             'severity': 'warning'
         })
     
-    # Alerta para alta taxa de detecção (possível falso positivo)
-    if total_detections > 100 and unique_motos < 5:
+    # Alerta para alta confiança (moto confirmada)
+    if confidence > 0.9:
         alerts.append({
-            'type': 'high_detection_rate',
-            'message': f'Alta taxa de detecção: {total_detections} detecções, {unique_motos} motos únicas',
-            'severity': 'warning'
+            'type': 'high_confidence',
+            'message': f'Moto detectada com alta confiança: {confidence:.2f}',
+            'severity': 'info'
+        })
+    
+    # Alerta para muitas detecções
+    if total_detections > 20 and total_detections % 10 == 0:
+        alerts.append({
+            'type': 'milestone',
+            'message': f'Marco atingido: {total_detections} detecções processadas',
+            'severity': 'info'
+        })
+    
+    # Alerta para sistema ativo
+    if total_detections == 1:
+        alerts.append({
+            'type': 'system_start',
+            'message': 'Sistema VisionMoto iniciado - Primeira detecção registrada',
+            'severity': 'info'
         })
     
     # Salva alertas
@@ -204,7 +220,7 @@ def check_alerts(class_id, confidence, total_detections, unique_motos):
         
         # Emite alertas via Socket.IO
         for alert in alerts:
-            socketio.emit('alert', alert, broadcast=True)
+            socketio.emit('alert', alert)
 
 @app.route('/metrics', methods=['GET'])
 def metrics():
@@ -217,6 +233,14 @@ def metrics():
     
     cursor.execute('SELECT COUNT(DISTINCT class_name) FROM detections WHERE class_name IS NOT NULL')
     unique_classes = cursor.fetchone()[0]
+    
+    # Calcula motos únicas baseado em posição aproximada (bbox)
+    cursor.execute('''
+        SELECT COUNT(DISTINCT CAST(x1/50 AS INTEGER) || '_' || CAST(y1/50 AS INTEGER)) 
+        FROM detections 
+        WHERE class_name = 'motorbike'
+    ''')
+    unique_motos_count = cursor.fetchone()[0]
     
     cursor.execute('SELECT fps FROM detections WHERE fps IS NOT NULL ORDER BY id DESC LIMIT 60')
     last_fps = [row[0] for row in cursor.fetchall()]
@@ -245,6 +269,7 @@ def metrics():
     return jsonify({
         'total_events': total_events,
         'unique_classes': unique_classes,
+        'unique_motos': unique_motos_count,
         'avg_fps_last_60': avg_fps,
         'avg_detection_rate': avg_detection_rate,
         'active_alerts': active_alerts,
@@ -355,7 +380,7 @@ def iot_sensor():
         'timestamp': timestamp,
         'battery_level': battery_level,
         'signal_strength': signal_strength
-    }, broadcast=True)
+    })
     
     return jsonify({'status': 'ok'}), 201
 
@@ -407,7 +432,7 @@ def iot_actuator():
         'status': status,
         'timestamp': timestamp,
         'power_level': power_level
-    }, broadcast=True)
+    })
     
     return jsonify({'status': 'ok'}), 201
 
