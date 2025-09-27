@@ -1,26 +1,28 @@
 # VisionMoto - Sistema de Detecção de Motos com IoT
 
-Sistema completo de detecção de motos em tempo real usando **Visão Computacional** e **IoT**, desenvolvido para o 3º Sprint de Disruptive Architectures.
+Sistema completo de detecção de motos em tempo real utilizando Visão Computacional e IoT, desenvolvido para o 3º Sprint de Disruptive Architectures.
 
-## 🎯 Visão Geral
+## Visão Geral
 
-O VisionMoto integra:
+O VisionMoto integra quatro componentes principais:
 - **IoT**: Simulação de sensores e atuadores para monitoramento
 - **Backend API**: Comunicação em tempo real via HTTP/REST
 - **Dashboard Web**: Interface visual com dados em tempo real
 - **Persistência**: Banco de dados SQLite para histórico
 
-## 🚀 Execução Rápida
+## Execução Rápida
 
 ### Sistema Completo (Recomendado)
 ```bash
 python visionmoto.py demo
 ```
+
 ### Outras Opções
 ```bash
 # Demonstração final
 python visionmoto.py demo-final
 
+# Apenas visão computacional
 python visionmoto.py vision
 
 # Apenas backend API
@@ -31,6 +33,11 @@ python visionmoto.py report
 
 # Ver todas as opções
 python visionmoto.py help
+```
+
+## Tecnologias Utilizadas
+
+### Visão Computacional
 - **OpenCV**: Processamento de vídeo
 - **Ultralytics**: Framework YOLO
 
@@ -50,51 +57,51 @@ python visionmoto.py help
 - **JavaScript**: Lógica do dashboard
 - **Socket.IO**: Atualizações em tempo real
 
-## 📊 Funcionalidades
+## Funcionalidades
 
 ### Visão Computacional
-- ✅ Detecção de motos em tempo real
-- ✅ Múltiplas classes (motos, carros, bicicletas)
-- ✅ Bounding boxes com confiança
-- ✅ Processamento de vídeo em tempo real
-- ✅ Métricas de performance (FPS)
+- Detecção de motos em tempo real
+- Múltiplas classes (motos, carros, bicicletas)
+- Bounding boxes com confiança
+- Processamento de vídeo em tempo real
+- Métricas de performance (FPS)
 
 ### IoT & Sensores
-- ✅ 6 sensores simulados de motos
-- ✅ 3 atuadores (travas, alarmes)
-- ✅ Monitoramento de bateria e sinal
-- ✅ Dados de temperatura e umidade
-- ✅ Status em tempo real
+- 6 sensores simulados de motos
+- 3 atuadores (travas, alarmes)
+- Monitoramento de bateria e sinal
+- Dados de temperatura e umidade
+- Status em tempo real
 
 ### Backend & API
-- ✅ API REST completa
-- ✅ Comunicação em tempo real (Socket.IO)
-- ✅ Persistência de dados
-- ✅ Sistema de alertas
-- ✅ Métricas agregadas
+- API REST completa
+- Comunicação em tempo real (Socket.IO)
+- Persistência de dados
+- Sistema de alertas
+- Métricas agregadas
 
 ### Dashboard Web
-- ✅ Interface moderna e responsiva
-- ✅ Dados em tempo real
-- ✅ Métricas visuais
-- ✅ Status de dispositivos IoT
-- ✅ Histórico de detecções
+- Interface moderna e responsiva
+- Dados em tempo real
+- Métricas visuais
+- Status de dispositivos IoT
+- Histórico de detecções
 
-## 🎮 Controles
+## Controles
 
 ### Sistema Principal
-- **'q'** = sair do sistema
-- **'s'** = salvar frame atual
+- **'q'**: Sair do sistema
+- **'s'**: Salvar frame atual
 
 ### Dashboard Web
 - Acesse: `http://localhost:5000`
 - Atualização automática a cada 2-3 segundos
 - Dados em tempo real via WebSocket
 
-## 📈 Métricas de Performance
+## Métricas de Performance
 
 ### Detecção de Visão Computacional
-- **FPS médio**: ~25-30 frames/segundo
+- **FPS médio**: 25-30 frames/segundo
 - **Precisão**: 85-95% para motos
 - **Classes detectadas**: motos, carros, bicicletas
 - **Latência**: <50ms por frame
@@ -111,7 +118,7 @@ python visionmoto.py help
 - **Persistência**: SQLite local
 - **Tempo real**: WebSocket com <50ms
 
-## 🔧 Instalação e Configuração
+## Instalação e Configuração
 
 ### 1. Instalar Dependências
 ```bash
@@ -133,7 +140,7 @@ python run_complete_system.py
 http://localhost:5000
 ```
 
-## 📋 Casos de Uso Demonstrados
+## Casos de Uso Demonstrados
 
 ### 1. Detecção de Moto em Tempo Real
 - Sistema detecta motos em vídeo
@@ -155,7 +162,7 @@ http://localhost:5000
 - Atuador pode ativar alarme
 - Sistema registra evento
 
-## 🎥 Demonstração
+## Demonstração
 
 ### Vídeo Demonstrativo
 - Sistema funcionando com detecção em tempo real
@@ -168,55 +175,56 @@ http://localhost:5000
 - Precisão de detecção: 85-95%
 - Tempo de resposta: <50ms
 
-## 🏆 Resultados do 3º Sprint
+## Resultados do 3º Sprint
 
-### ✅ Requisitos Atendidos
+### Requisitos Atendidos
 
 #### Visão Computacional
-- ✅ Script funcional de detecção de múltiplas motos
-- ✅ Output visual com detecções destacadas em tempo real
-- ✅ Uso de YOLOv8 para detecção
-- ✅ Métricas de performance quantitativa
+- Script funcional de detecção de múltiplas motos
+- Output visual com detecções destacadas em tempo real
+- Uso de YOLOv8 para detecção
+- Métricas de performance quantitativa
 
 #### IoT & Comunicação
-- ✅ Simulação com 6 sensores e 3 atuadores distintos
-- ✅ Comunicação em tempo real via HTTP/REST
-- ✅ Interface gráfica com dados de telemetria
-- ✅ Registro persistente no banco de dados
-- ✅ Casos de uso realistas (moto desaparecida, localização errada)
+- Simulação com 6 sensores e 3 atuadores distintos
+- Comunicação em tempo real via HTTP/REST
+- Interface gráfica com dados de telemetria
+- Registro persistente no banco de dados
+- Casos de uso realistas (moto desaparecida, localização errada)
 
 #### Integração & Performance
-- ✅ Comunicação entre visão e backend: **30 pts**
-- ✅ Dashboard/output visual em tempo real: **30 pts**
-- ✅ Persistência e estruturação dos dados: **20 pts**
-- ✅ Organização do código e documentação: **20 pts**
+- Comunicação entre visão e backend: **30 pts**
+- Dashboard/output visual em tempo real: **30 pts**
+- Persistência e estruturação dos dados: **20 pts**
+- Organização do código e documentação: **20 pts**
 
 **Total: 100 pontos**
 
-## 🔮 Próximos Passos
+## Próximos Passos
 
 ### Melhorias Futuras
-- [ ] Implementação MQTT para IoT
-- [ ] Integração com câmeras reais
-- [ ] Machine Learning para classificação
-- [ ] Sistema de notificações
-- [ ] API mobile
+- Implementação MQTT para IoT
+- Integração com câmeras reais
+- Machine Learning para classificação
+- Sistema de notificações
+- API mobile
 
 ### Expansões
-- [ ] Múltiplas câmeras simultâneas
-- [ ] Reconhecimento de placas
-- [ ] Sistema de pagamento
-- [ ] Integração com apps de mobilidade
+- Múltiplas câmeras simultâneas
+- Reconhecimento de placas
+- Sistema de pagamento
+- Integração com apps de mobilidade
 
-## 👥 Equipe
+## Equipe
 
-**VisionMoto Team** - 3º Sprint Disruptive Architectures
-- Desenvolvimento: Visão Computacional + IoT
-- Integração: Backend + Frontend
-- Demonstração: Sistema completo funcional
+**Thomaz Oliveira Vilas Boas Bartol** - RM555323  
+**Vinicius Souza Carvalho** - RM556089  
+**Gabriel Duarte** - RM556972  
+
+**3º Sprint - Disruptive Architectures: IoT, IoB & Generative AI**
 
 ---
 
-**Projeto desenvolvido para o 3º Sprint - Disruptive Architectures: IoT, IoB & Generative AI**
+**Projeto desenvolvido para o 3º Sprint - Disruptive Architectures**
 
-🎯 **Sistema completo funcionando com integração de Visão Computacional e IoT!**
+Sistema completo funcionando com integração de Visão Computacional e IoT.

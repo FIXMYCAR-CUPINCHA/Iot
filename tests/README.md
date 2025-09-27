@@ -1,8 +1,8 @@
-# 🧪 Tests - VisionMoto
+# Tests - VisionMoto
 
 Esta pasta contém os testes do sistema VisionMoto.
 
-## 📁 Arquivos
+## Arquivos
 
 ### `test_system.py`
 **Teste completo do sistema**
@@ -26,7 +26,7 @@ python tests/test_system.py
 python tests/test_backend.py
 ```
 
-## 🚀 Execução
+## Execução
 
 ### Executar todos os testes:
 ```bash
@@ -39,21 +39,21 @@ python tests/test_system.py
 python tests/test_backend.py
 ```
 
-## ✅ Cobertura de Testes
+## Cobertura de Testes
 
 ### Sistema Completo:
-- ✅ Detecção YOLOv8
-- ✅ Simulação IoT
-- ✅ Banco de dados SQLite
-- ✅ Integração de componentes
+- Detecção YOLOv8
+- Simulação IoT
+- Banco de dados SQLite
+- Integração de componentes
 
 ### Backend/API:
-- ✅ Rotas REST
-- ✅ Socket.IO
-- ✅ Persistência
-- ✅ Métricas
+- Rotas REST
+- Socket.IO
+- Persistência
+- Métricas
 
-## 📊 Relatórios
+## Relatórios
 
 Os testes geram:
 - Status de cada componente

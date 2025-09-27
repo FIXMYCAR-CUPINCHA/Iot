@@ -1,8 +1,8 @@
-# 📈 Reports - VisionMoto
+# Reports - VisionMoto
 
 Esta pasta contém relatórios e análises do sistema VisionMoto.
 
-## 📁 Arquivos
+## Arquivos
 
 ### `performance_report.py`
 **Gerador de relatório de performance**
@@ -22,7 +22,7 @@ python reports/performance_report.py
 - Pontuação por critério
 - Recomendações de melhoria
 
-## 🚀 Uso
+## Uso
 
 ### Gerar novo relatório:
 ```bash
@@ -34,27 +34,27 @@ python visionmoto.py report
 python reports/performance_report.py
 ```
 
-## 📊 Métricas Analisadas
+## Métricas Analisadas
 
 ### Performance:
-- ✅ FPS médio do sistema
-- ✅ Taxa de detecção
-- ✅ Latência das APIs
-- ✅ Throughput do backend
+- FPS médio do sistema
+- Taxa de detecção
+- Latência das APIs
+- Throughput do backend
 
 ### Funcionalidades:
-- ✅ Detecção de visão computacional
-- ✅ Simulação IoT
-- ✅ Dashboard em tempo real
-- ✅ Persistência de dados
+- Detecção de visão computacional
+- Simulação IoT
+- Dashboard em tempo real
+- Persistência de dados
 
 ### Conformidade 3ª Sprint:
-- ✅ Comunicação sensores/backend (30 pts)
-- ✅ Dashboard/output visual (30 pts)
-- ✅ Persistência de dados (20 pts)
-- ✅ Organização/documentação (20 pts)
+- Comunicação sensores/backend (30 pts)
+- Dashboard/output visual (30 pts)
+- Persistência de dados (20 pts)
+- Organização/documentação (20 pts)
 
-## 📋 Formato do Relatório
+## Formato do Relatório
 
 ```json
 {

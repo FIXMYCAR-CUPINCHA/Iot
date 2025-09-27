@@ -1,8 +1,8 @@
-# 🎯 Demos - VisionMoto
+# Demos - VisionMoto
 
 Esta pasta contém as demonstrações principais do sistema VisionMoto.
 
-## 📁 Arquivos
+## Arquivos
 
 ### `run_complete_system.py`
 **Demonstração completa integrada**
@@ -10,7 +10,7 @@ Esta pasta contém as demonstrações principais do sistema VisionMoto.
 - Inicia backend Flask automaticamente
 - Simula dispositivos IoT
 - Processa vídeo com detecção de motos
-- **Recomendado para apresentações**
+- Recomendado para apresentações
 
 ```bash
 python demos/run_complete_system.py
@@ -37,7 +37,7 @@ python demos/demo_final.py
 python demos/main.py
 ```
 
-## 🚀 Execução Rápida
+## Execução Rápida
 
 Para executar a demonstração completa:
 ```bash
@@ -45,7 +45,7 @@ Para executar a demonstração completa:
 python visionmoto.py demo
 ```
 
-## 📊 Dashboard
+## Dashboard
 
 Após executar qualquer demo com backend, acesse:
 - **URL**: http://localhost:5000
