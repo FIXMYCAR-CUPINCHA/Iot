@@ -50,7 +50,8 @@ python visionmoto.py help
 ### IoT & Simulação
 - **Threading**: Simulação paralela de dispositivos
 - **JSON**: Formato de dados IoT
-- **HTTP REST**: Comunicação IoT
+- **HTTP REST**: Comunicação IoT primária
+- **MQTT**: Comunicação IoT avançada (Paho-MQTT)
 
 ### Frontend
 - **HTML5/CSS3**: Interface responsiva
@@ -69,6 +70,7 @@ python visionmoto.py help
 ### IoT & Sensores
 - 6 sensores simulados de motos
 - 3 atuadores (travas, alarmes)
+- Comunicação MQTT + HTTP/REST
 - Monitoramento de bateria e sinal
 - Dados de temperatura e umidade
 - Status em tempo real
@@ -187,7 +189,7 @@ http://localhost:5000
 
 #### IoT & Comunicação
 - Simulação com 6 sensores e 3 atuadores distintos
-- Comunicação em tempo real via HTTP/REST
+- Comunicação em tempo real via MQTT e HTTP/REST
 - Interface gráfica com dados de telemetria
 - Registro persistente no banco de dados
 - Casos de uso realistas (moto desaparecida, localização errada)
@@ -203,10 +205,10 @@ http://localhost:5000
 ## Próximos Passos
 
 ### Melhorias Futuras
-- Implementação MQTT para IoT
+- Broker MQTT dedicado (Mosquitto)
 - Integração com câmeras reais
 - Machine Learning para classificação
-- Sistema de notificações
+- Sistema de notificações push
 - API mobile
 
 ### Expansões

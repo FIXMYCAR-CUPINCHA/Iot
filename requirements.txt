@@ -6,3 +6,4 @@ scipy
 flask
 flask-socketio
 requests
+paho-mqtt
