@@ -12,7 +12,8 @@ import subprocess
 from datetime import datetime
 
 # Adiciona o diretório src ao path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from src.detection.moto_detector import MotoDetector
 from src.utils.database import DatabaseManager

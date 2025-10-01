@@ -113,7 +113,7 @@ class MQTTIoTClient:
             
             return self.connected
         except Exception as e:
-            print(f"❌ Erro ao conectar MQTT: {e}")
+            # Silencioso - será tratado pelo simulador
             return False
     
     def disconnect(self):

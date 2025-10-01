@@ -105,7 +105,7 @@ class DatabaseManager:
         cursor = conn.cursor()
         
         cursor.execute('''
-            SELECT frame, class_name, confidence, timestamp 
+            SELECT frame, class_name, confidence, created_at as timestamp 
             FROM detections 
             ORDER BY id DESC 
             LIMIT ?

@@ -72,7 +72,7 @@ class VisionMotoAPI:
         cursor = conn.cursor()
         
         cursor.execute('''
-            INSERT INTO detections (timestamp, frame, class_name, confidence, bbox, fps)
+            INSERT INTO detections (created_at, frame, class_name, confidence, bbox, fps)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (datetime.now().isoformat(), frame, class_name, confidence, str(bbox), fps))
         

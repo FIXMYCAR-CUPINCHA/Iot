@@ -24,7 +24,7 @@ python visionmoto.py demo-final
 
 # Apenas visão computacional
 python visionmoto.py vision
-
+fal
 # Apenas backend API
 python visionmoto.py backend
 

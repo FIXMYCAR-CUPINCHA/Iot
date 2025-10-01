@@ -104,11 +104,15 @@ class IoTDeviceSimulator:
         # Cliente MQTT (se disponível)
         self.mqtt_client = None
         if self.use_mqtt:
-            self.mqtt_client = MQTTIoTClient(api_url=api_url)
-            if self.mqtt_client.connect():
-                print("✅ MQTT habilitado para IoT")
-            else:
-                print("⚠️ MQTT falhou, usando apenas HTTP")
+            try:
+                self.mqtt_client = MQTTIoTClient(api_url=api_url)
+                if self.mqtt_client.connect():
+                    print("✅ MQTT habilitado para IoT")
+                else:
+                    print("🌐 Protocolo: HTTP")
+                    self.use_mqtt = False
+            except Exception as e:
+                print("🌐 Protocolo: HTTP")
                 self.use_mqtt = False
         
         # Cria dispositivos simulados
