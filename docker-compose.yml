@@ -1,0 +1,142 @@
+# Docker Compose para VisionMoto - Sistema Completo
+version: '3.8'
+
+services:
+  # API Principal de Integração
+  visionmoto-api:
+    build: .
+    container_name: visionmoto-integration-api
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_PATH=/app/data/visionmoto_integration.db
+    networks:
+      - visionmoto-network
+    restart: unless-stopped
+
+  # Sistema de Visão Computacional
+  visionmoto-vision:
+    build: .
+    container_name: visionmoto-vision
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./demos:/app/demos
+    environment:
+      - PYTHONPATH=/app
+      - API_URL=http://visionmoto-api:5001
+    command: ["python", "visionmoto.py", "demo"]
+    networks:
+      - visionmoto-network
+    depends_on:
+      - visionmoto-api
+    restart: unless-stopped
+
+  # Banco de Dados PostgreSQL (para produção)
+  postgres:
+    image: postgres:13
+    container_name: visionmoto-postgres
+    environment:
+      POSTGRES_DB: visionmoto
+      POSTGRES_USER: visionmoto
+      POSTGRES_PASSWORD: visionmoto123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - visionmoto-network
+    restart: unless-stopped
+
+  # Redis para Cache e Sessões
+  redis:
+    image: redis:7-alpine
+    container_name: visionmoto-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - visionmoto-network
+    restart: unless-stopped
+
+  # MQTT Broker para IoT
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: visionmoto-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - visionmoto-network
+    restart: unless-stopped
+
+  # Nginx para Load Balancing
+  nginx:
+    image: nginx:alpine
+    container_name: visionmoto-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    networks:
+      - visionmoto-network
+    depends_on:
+      - visionmoto-api
+      - visionmoto-vision
+    restart: unless-stopped
+
+  # Prometheus para Monitoramento
+  prometheus:
+    image: prom/prometheus
+    container_name: visionmoto-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - visionmoto-network
+    restart: unless-stopped
+
+  # Grafana para Dashboards
+  grafana:
+    image: grafana/grafana
+    container_name: visionmoto-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana:/etc/grafana/provisioning
+    networks:
+      - visionmoto-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_logs:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  visionmoto-network:
+    driver: bridge

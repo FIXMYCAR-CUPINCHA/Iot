@@ -5,5 +5,14 @@ filterpy
 scipy
 flask
 flask-socketio
+flask-cors
 requests
 paho-mqtt
+pyjwt
+werkzeug
+psycopg2-binary
+redis
+pytest
+pytest-cov
+black
+flake8

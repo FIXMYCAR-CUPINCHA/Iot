@@ -1,0 +1,25 @@
+# CODEOWNERS para VisionMoto
+# Define quem deve revisar mudanças em arquivos específicos
+
+# Arquivos de configuração críticos
+/.github/                    @vinicius @thomaz @gabriel
+/Dockerfile                  @vinicius @thomaz @gabriel  
+/docker-compose.yml          @vinicius @thomaz @gabriel
+/requirements.txt            @vinicius @thomaz @gabriel
+
+# API principal
+/src/backend/integration_api.py  @vinicius @thomaz @gabriel
+
+# Documentação
+/README*.md                  @vinicius @thomaz @gabriel
+/integration/                @vinicius @thomaz @gabriel
+
+# Scripts de deploy
+/scripts/                    @vinicius @thomaz @gabriel
+/start_integration.py        @vinicius @thomaz @gabriel
+
+# Testes
+/tests/                      @vinicius @thomaz @gabriel
+
+# Configurações de CI/CD
+/.github/workflows/          @vinicius @thomaz @gabriel

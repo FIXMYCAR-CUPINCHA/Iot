@@ -1,0 +1,256 @@
+# Workflow específico para Pull Requests
+name: PR Quality Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  # Verificação rápida para PRs
+  pr-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-pr-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-pr-
+          ${{ runner.os }}-pip-
+    
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 black pytest pytest-cov
+    
+    - name: Verificar arquivos modificados
+      run: |
+        echo "Arquivos modificados no PR:"
+        git diff --name-only origin/${{ github.base_ref }}...HEAD
+        
+        echo "Arquivos Python modificados:"
+        git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "\.py$" || echo "Nenhum arquivo Python modificado"
+    
+    - name: Lint apenas arquivos modificados
+      run: |
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "\.py$" | tr '\n' ' ')
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "Executando flake8 em: $CHANGED_FILES"
+          flake8 $CHANGED_FILES --count --select=E9,F63,F7,F82 --show-source --statistics
+        else
+          echo "Nenhum arquivo Python para verificar"
+        fi
+    
+    - name: Verificar formatação dos arquivos modificados
+      run: |
+        CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E "\.py$" | tr '\n' ' ')
+        if [ -n "$CHANGED_FILES" ]; then
+          echo "Verificando formatação em: $CHANGED_FILES"
+          black --check --diff $CHANGED_FILES
+        else
+          echo "Nenhum arquivo Python para verificar formatação"
+        fi
+    
+    - name: Executar testes rápidos
+      run: |
+        pytest tests/test_integration_api.py -v --tb=short
+    
+    - name: Verificar se pode fazer build
+      run: |
+        python -c "
+        import sys
+        sys.path.insert(0, 'src')
+        try:
+            from backend.integration_api import VisionMotoIntegrationAPI
+            print('✅ Import da API principal: OK')
+        except Exception as e:
+            print(f'❌ Erro no import: {e}')
+            sys.exit(1)
+        "
+    
+    - name: Comentar no PR com resultado
+      uses: actions/github-script@v6
+      if: always()
+      with:
+        script: |
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          
+          // Remove comentários anteriores do bot
+          for (const comment of comments) {
+            if (comment.user.type === 'Bot' && comment.body.includes('🤖 PR Quality Check')) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: comment.id,
+              });
+            }
+          }
+          
+          const success = '${{ job.status }}' === 'success';
+          const status = success ? '✅ PASSOU' : '❌ FALHOU';
+          const emoji = success ? '🎉' : '⚠️';
+          
+          const body = `## 🤖 PR Quality Check ${status}
+          
+${emoji} **Status:** ${status}
+**Commit:** \`${{ github.sha }}\`
+**Workflow:** [Ver detalhes](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+### Verificações Realizadas:
+- ${success ? '✅' : '❌'} Lint (flake8) nos arquivos modificados
+- ${success ? '✅' : '❌'} Formatação (black) nos arquivos modificados  
+- ${success ? '✅' : '❌'} Testes unitários básicos
+- ${success ? '✅' : '❌'} Verificação de imports
+
+${success ? 
+'🚀 **Este PR está pronto para revisão!**' : 
+'🔧 **Este PR precisa de correções antes da revisão.**'}
+          `;
+          
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: body
+          });
+
+  # Análise de diff para mudanças críticas
+  diff-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Analisar mudanças críticas
+      run: |
+        echo "## 📊 Análise de Mudanças no PR" > diff-analysis.md
+        echo "" >> diff-analysis.md
+        
+        # Verifica mudanças em arquivos críticos
+        CRITICAL_FILES="src/backend/integration_api.py Dockerfile docker-compose.yml requirements.txt"
+        
+        for file in $CRITICAL_FILES; do
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -q "$file"; then
+            echo "⚠️ **Arquivo crítico modificado:** \`$file\`" >> diff-analysis.md
+            echo "" >> diff-analysis.md
+            echo "\`\`\`diff" >> diff-analysis.md
+            git diff origin/${{ github.base_ref }}...HEAD -- "$file" | head -50 >> diff-analysis.md
+            echo "\`\`\`" >> diff-analysis.md
+            echo "" >> diff-analysis.md
+          fi
+        done
+        
+        # Conta linhas adicionadas/removidas
+        STATS=$(git diff --stat origin/${{ github.base_ref }}...HEAD)
+        echo "### 📈 Estatísticas:" >> diff-analysis.md
+        echo "\`\`\`" >> diff-analysis.md
+        echo "$STATS" >> diff-analysis.md
+        echo "\`\`\`" >> diff-analysis.md
+        
+        cat diff-analysis.md
+    
+    - name: Upload análise como artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: diff-analysis
+        path: diff-analysis.md
+
+  # Verificação de segurança para PRs
+  security-check-pr:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Instalar ferramentas de segurança
+      run: |
+        pip install bandit safety
+    
+    - name: Verificar segurança com bandit
+      run: |
+        bandit -r src/ -f json -o bandit-pr-report.json || true
+        
+        if [ -f bandit-pr-report.json ]; then
+          echo "## 🔒 Relatório de Segurança (Bandit)" > security-report.md
+          echo "" >> security-report.md
+          
+          ISSUES=$(cat bandit-pr-report.json | python -c "
+import json, sys
+data = json.load(sys.stdin)
+print(f'**Issues encontrados:** {len(data.get(\"results\", []))}')
+for issue in data.get('results', [])[:5]:  # Mostra apenas os 5 primeiros
+    print(f'- **{issue[\"test_name\"]}** em \`{issue[\"filename\"]}:{issue[\"line_number\"]}\`')
+    print(f'  Severidade: {issue[\"issue_severity\"]} | Confiança: {issue[\"issue_confidence\"]}')
+    print()
+          ")
+          
+          echo "$ISSUES" >> security-report.md
+          cat security-report.md
+        fi
+      continue-on-error: true
+    
+    - name: Verificar dependências com safety
+      run: |
+        safety check --json --output safety-pr-report.json || true
+        
+        if [ -f safety-pr-report.json ]; then
+          echo "## 📦 Verificação de Dependências (Safety)" >> security-report.md
+          echo "" >> security-report.md
+          
+          VULNS=$(cat safety-pr-report.json | python -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    vulns = data.get('vulnerabilities', [])
+    print(f'**Vulnerabilidades encontradas:** {len(vulns)}')
+    for vuln in vulns[:3]:  # Mostra apenas as 3 primeiras
+        print(f'- **{vuln[\"package_name\"]}** {vuln[\"analyzed_version\"]}')
+        print(f'  {vuln[\"advisory\"]}')
+        print()
+except:
+    print('Nenhuma vulnerabilidade encontrada')
+          ")
+          
+          echo "$VULNS" >> security-report.md
+        fi
+      continue-on-error: true
+    
+    - name: Upload relatório de segurança
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-report-pr
+        path: |
+          security-report.md
+          bandit-pr-report.json
+          safety-pr-report.json

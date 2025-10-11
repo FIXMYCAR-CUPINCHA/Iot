@@ -2,8 +2,8 @@ import cv2
 from ultralytics import YOLO
 import numpy as np
 
-model = YOLO('yolov8n.pt')
-video_path = 'assets/sample_video.mp4'
+model = YOLO("yolov8n.pt")
+video_path = "assets/sample_video.mp4"
 cap = cv2.VideoCapture(video_path)
 
 while True:
@@ -22,7 +22,7 @@ while True:
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
     cv2.imshow("FleetZone - YOLOv8 Deteção", frame)
-    if cv2.waitKey(1) & 0xFF == ord('q'):
+    if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
 cap.release()

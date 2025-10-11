@@ -1,6 +1,7 @@
 import numpy as np
 from filterpy.kalman import KalmanFilter
 
+
 class Sort:
     def __init__(self, max_age=5, min_hits=3, iou_threshold=0.3):
         self.max_age = max_age
@@ -26,7 +27,9 @@ class Sort:
         for t in reversed(to_del):
             self.trackers.pop(t)
 
-        matches, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, trks, self.iou_threshold)
+        matches, unmatched_dets, unmatched_trks = associate_detections_to_trackers(
+            dets, trks, self.iou_threshold
+        )
 
         for m in matches:
             self.trackers[m[1]].update(dets[m[0], :])
@@ -39,7 +42,9 @@ class Sort:
         for trk in reversed(self.trackers):
             d = trk.get_state()
             if trk.time_since_update < 1:
-                ret.append(np.concatenate((d[:4].reshape(-1), [trk.id + 1])).reshape(1, -1))
+                ret.append(
+                    np.concatenate((d[:4].reshape(-1), [trk.id + 1])).reshape(1, -1)
+                )
             i -= 1
             if trk.time_since_update > self.max_age:
                 self.trackers.pop(i)
@@ -48,12 +53,17 @@ class Sort:
             return np.concatenate(ret)
         return np.empty((0, 5))
 
+
 def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
     from scipy.optimize import linear_sum_assignment
     from scipy.spatial.distance import cdist
 
     if len(trackers) == 0:
-        return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0), dtype=int)
+        return (
+            np.empty((0, 2), dtype=int),
+            np.arange(len(detections)),
+            np.empty((0), dtype=int),
+        )
 
     iou_matrix = 1 - cdist(detections[:, :4], trackers[:, :4])
     matched_indices = linear_sum_assignment(iou_matrix)
@@ -84,26 +94,36 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
 
     return matches, np.array(unmatched_detections), np.array(unmatched_trackers)
 
+
 class KalmanBoxTracker:
     count = 0
+
     def __init__(self, bbox):
         self.kf = KalmanFilter(dim_x=7, dim_z=4)
-        self.kf.F = np.array([[1, 0, 0, 0, 1, 0, 0],
-                              [0, 1, 0, 0, 0, 1, 0],
-                              [0, 0, 1, 0, 0, 0, 1],
-                              [0, 0, 0, 1, 0, 0, 0],
-                              [0, 0, 0, 0, 1, 0, 0],
-                              [0, 0, 0, 0, 0, 1, 0],
-                              [0, 0, 0, 0, 0, 0, 1]])
-        self.kf.H = np.array([[1, 0, 0, 0, 0, 0, 0],
-                              [0, 1, 0, 0, 0, 0, 0],
-                              [0, 0, 1, 0, 0, 0, 0],
-                              [0, 0, 0, 1, 0, 0, 0]])
-        self.kf.R[2:,2:] *= 10.
-        self.kf.P[4:,4:] *= 1000.
-        self.kf.P *= 10.
-        self.kf.Q[-1,-1] *= 0.01
-        self.kf.Q[4:,4:] *= 0.01
+        self.kf.F = np.array(
+            [
+                [1, 0, 0, 0, 1, 0, 0],
+                [0, 1, 0, 0, 0, 1, 0],
+                [0, 0, 1, 0, 0, 0, 1],
+                [0, 0, 0, 1, 0, 0, 0],
+                [0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 0, 1, 0],
+                [0, 0, 0, 0, 0, 0, 1],
+            ]
+        )
+        self.kf.H = np.array(
+            [
+                [1, 0, 0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0, 0, 0],
+                [0, 0, 1, 0, 0, 0, 0],
+                [0, 0, 0, 1, 0, 0, 0],
+            ]
+        )
+        self.kf.R[2:, 2:] *= 10.0
+        self.kf.P[4:, 4:] *= 1000.0
+        self.kf.P *= 10.0
+        self.kf.Q[-1, -1] *= 0.01
+        self.kf.Q[4:, 4:] *= 0.01
 
         self.kf.x[:4] = bbox[:4].reshape((4, 1))
         self.time_since_update = 0

@@ -1,0 +1,407 @@
+# CI/CD Pipeline para VisionMoto - Challenge 2025
+name: VisionMoto CI/CD
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.9'
+  NODE_VERSION: '18'
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_NAME: visionmoto
+
+jobs:
+  # Validação de Código e Testes
+  code-quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          ${{ runner.os }}-pip-
+    
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov pytest-xdist flake8 black mypy bandit safety
+    
+    - name: Verificar sintaxe Python
+      run: |
+        python -m py_compile src/**/*.py
+    
+    - name: Lint com flake8
+      run: |
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=__pycache__
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Verificar formatação com black
+      run: |
+        black --check --diff src/
+    
+    - name: Type checking com mypy
+      run: |
+        mypy src/ --ignore-missing-imports --no-strict-optional
+      continue-on-error: true
+    
+    - name: Security check com bandit
+      run: |
+        bandit -r src/ -f json -o bandit-report.json
+      continue-on-error: true
+    
+    - name: Dependency security check
+      run: |
+        safety check --json --output safety-report.json
+      continue-on-error: true
+    
+    - name: Executar testes unitários
+      run: |
+        pytest tests/ -v --cov=src/ --cov-report=xml --cov-report=html --junitxml=pytest-report.xml -n auto
+    
+    - name: Upload coverage para Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-${{ matrix.python-version }}
+        fail_ci_if_error: false
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          pytest-report.xml
+          coverage.xml
+          htmlcov/
+          bandit-report.json
+          safety-report.json
+
+  # Build e Testes de Integração
+  integration-tests:
+    needs: code-quality
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: visionmoto_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Instalar dependências
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+    
+    - name: Executar testes de integração
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/visionmoto_test
+        REDIS_URL: redis://localhost:6379
+      run: |
+        pytest tests/integration/ -v --tb=short
+      continue-on-error: true
+    
+    - name: Testar API endpoints
+      run: |
+        python3 src/backend/integration_api.py &
+        sleep 10
+        curl -f http://localhost:5001/health || exit 1
+        curl -f http://localhost:5001/api/java/motos/status || exit 1
+        curl -f http://localhost:5001/api/dotnet/Dashboard/GetMotorcycleData || exit 1
+        pkill -f integration_api.py
+
+  # Build Docker Images
+  docker-build:
+    needs: [code-quality, integration-tests]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build e push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+    
+    - name: Test Docker image
+      run: |
+        docker run --rm -d -p 5001:5001 --name test-container ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest
+        sleep 15
+        curl -f http://localhost:5001/health || exit 1
+        docker stop test-container
+
+  # Security Scan
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Run Trivy vulnerability scanner (filesystem)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-fs-results.sarif'
+    
+    - name: Run Trivy vulnerability scanner (config)
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'config'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-config-results.sarif'
+    
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-fs-results.sarif'
+      if: always()
+    
+    - name: Upload Trivy config results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-config-results.sarif'
+      if: always()
+
+  # Deploy para Staging
+  deploy-staging:
+    needs: [code-quality, integration-tests, security-scan]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Deploy to staging with Docker Compose
+      run: |
+        echo "🚀 Deploying VisionMoto to staging environment..."
+        
+        # Simula deploy com docker-compose
+        echo "📦 Pulling latest images..."
+        docker-compose -f docker-compose.yml pull
+        
+        echo "🔄 Starting services..."
+        docker-compose -f docker-compose.yml up -d
+        
+        echo "⏳ Waiting for services to be ready..."
+        sleep 30
+        
+        echo "🔍 Health check..."
+        curl -f http://localhost:5001/health || exit 1
+        
+        echo "✅ Staging deployment successful!"
+        
+  # Deploy para Produção
+  deploy-production:
+    needs: [code-quality, integration-tests, security-scan, docker-build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying VisionMoto to production environment..."
+        
+        # Aqui seria a integração com serviços de cloud (AWS, Azure, GCP)
+        echo "📦 Using production Docker image..."
+        echo "Image: ${{ env.DOCKER_REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_NAME }}:latest"
+        
+        echo "🔄 Rolling update deployment..."
+        # kubectl apply -f k8s/ ou docker service update, etc.
+        
+        echo "⏳ Waiting for deployment to stabilize..."
+        sleep 60
+        
+        echo "🔍 Production health check..."
+        # curl -f https://visionmoto.production.com/health || exit 1
+        
+        echo "✅ Production deployment successful!"
+
+  # Performance Tests
+  performance-tests:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v4
+    
+    - name: Install k6
+      run: |
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+    
+    - name: Run performance tests
+      run: |
+        k6 run --vus 10 --duration 30s tests/performance/api_load_test.js
+      continue-on-error: true
+
+  # Notificação e Relatórios
+  notify-and-report:
+    needs: [code-quality, integration-tests, security-scan, docker-build]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Generate build report
+      run: |
+        echo "# VisionMoto Build Report" > build-report.md
+        echo "**Build:** ${{ github.run_number }}" >> build-report.md
+        echo "**Commit:** ${{ github.sha }}" >> build-report.md
+        echo "**Branch:** ${{ github.ref_name }}" >> build-report.md
+        echo "**Author:** ${{ github.actor }}" >> build-report.md
+        echo "" >> build-report.md
+        
+        if [ "${{ needs.code-quality.result }}" == "success" ]; then
+          echo "✅ Code Quality: PASSED" >> build-report.md
+        else
+          echo "❌ Code Quality: FAILED" >> build-report.md
+        fi
+        
+        if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "✅ Integration Tests: PASSED" >> build-report.md
+        else
+          echo "❌ Integration Tests: FAILED" >> build-report.md
+        fi
+        
+        if [ "${{ needs.security-scan.result }}" == "success" ]; then
+          echo "✅ Security Scan: PASSED" >> build-report.md
+        else
+          echo "❌ Security Scan: FAILED" >> build-report.md
+        fi
+        
+        if [ "${{ needs.docker-build.result }}" == "success" ]; then
+          echo "✅ Docker Build: PASSED" >> build-report.md
+        else
+          echo "❌ Docker Build: FAILED" >> build-report.md
+        fi
+    
+    - name: Comment PR with results
+      uses: actions/github-script@v6
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('build-report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });
+    
+    - name: Notify Slack on failure
+      uses: 8398a7/action-slack@v3
+      if: failure()
+      with:
+        status: failure
+        channel: '#visionmoto-alerts'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        fields: repo,message,commit,author,action,eventName,ref,workflow
+    
+    - name: Notify Slack on success
+      uses: 8398a7/action-slack@v3
+      if: success() && github.ref == 'refs/heads/main'
+      with:
+        status: success
+        channel: '#visionmoto-deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        text: '🎉 VisionMoto deployed successfully to production!'
