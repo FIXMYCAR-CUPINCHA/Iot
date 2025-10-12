@@ -345,7 +345,7 @@ class VisionMotoIntegrationAPI:
                     {
                         "user_id": user_data["id"],
                         "email": email,
-                        "exp": datetime.utcnow() + timedelta(hours=24),
+                        "exp": datetime.now().timestamp() + (24 * 3600),
                     },
                     self.app.config["SECRET_KEY"],
                     algorithm="HS256",

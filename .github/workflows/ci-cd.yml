@@ -54,12 +54,12 @@ jobs:
     
     - name: Lint com flake8
       run: |
-        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=__pycache__
-        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 src/ tests/ --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=__pycache__
+        flake8 src/ tests/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Verificar formatação com black
       run: |
-        black --check --diff src/
+        black --check --diff src/ tests/
     
     - name: Type checking com mypy
       run: |
@@ -390,18 +390,20 @@ jobs:
     
     - name: Notify Slack on failure
       uses: 8398a7/action-slack@v3
-      if: failure()
+      if: failure() && secrets.SLACK_WEBHOOK_URL != ''
       with:
         status: failure
         channel: '#visionmoto-alerts'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
         fields: repo,message,commit,author,action,eventName,ref,workflow
+      continue-on-error: true
     
     - name: Notify Slack on success
       uses: 8398a7/action-slack@v3
-      if: success() && github.ref == 'refs/heads/main'
+      if: success() && github.ref == 'refs/heads/main' && secrets.SLACK_WEBHOOK_URL != ''
       with:
         status: success
         channel: '#visionmoto-deployments'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
         text: '🎉 VisionMoto deployed successfully to production!'
+      continue-on-error: true
