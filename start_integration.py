@@ -13,21 +13,9 @@ from pathlib import Path
 
 def print_banner():
     """Exibe banner do sistema"""
-    banner = """
-    ╔══════════════════════════════════════════════════════════════╗
-    ║                     VisionMoto v2.0                         ║
-    ║              Sistema Integrado - 4º Sprint                  ║
-    ║                   Challenge 2025                            ║
-    ╠══════════════════════════════════════════════════════════════╣
-    ║  🏍️  Detecção de Motos com IA                              ║
-    ║  📱  API para Mobile App                                    ║
-    ║  ☕  Integração Java/Spring Boot                           ║
-    ║  🔷  Integração .NET                                        ║
-    ║  🗄️   Banco de Dados Expandido                              ║
-    ║  🐳  DevOps com Docker                                      ║
-    ╚══════════════════════════════════════════════════════════════╝
-    """
-    print(banner)
+    print("🚀 VisionMoto v2.0 - Sistema Integrado")
+    print("Challenge 2025 - 4º Sprint")
+    print("-" * 40)
 
 def check_dependencies():
     """Verifica dependências necessárias"""
@@ -92,45 +80,17 @@ def start_vision_system():
         return None
 
 def show_integration_info():
-    """Mostra informações de integração"""
-    print("\n" + "="*60)
-    print("📋 INFORMAÇÕES DE INTEGRAÇÃO")
-    print("="*60)
-    
-    print("\n🌐 ENDPOINTS DISPONÍVEIS:")
-    print("├── API Principal: http://localhost:5001")
-    print("├── Dashboard: http://localhost:5001/dashboard")
-    print("├── Health Check: http://localhost:5001/health")
-    print("└── Sistema Visão: http://localhost:5000")
-    
-    print("\n📱 MOBILE APP ENDPOINTS:")
-    print("├── Login: POST /api/mobile/auth/login")
-    print("├── Motos: GET /api/mobile/motos")
-    print("└── Reservar: POST /api/mobile/motos/{id}/reservar")
-    
-    print("\n☕ JAVA/SPRING BOOT ENDPOINTS:")
-    print("├── Status Motos: GET /api/java/motos/status")
-    print("└── Alertas: GET/POST /api/java/alertas")
-    
-    print("\n🔷 .NET ENDPOINTS:")
-    print("├── Motorcycle Data: GET /api/dotnet/Dashboard/GetMotorcycleData")
-    print("└── Usage Report: POST /api/dotnet/Reports/GenerateUsageReport")
-    
-    print("\n🗄️  DATABASE ENDPOINTS:")
-    print("├── Backup: POST /api/database/backup")
-    print("└── Analytics: GET /api/database/analytics")
-    
-    print("\n📡 IOT ENDPOINTS:")
-    print("├── Devices: GET /api/iot/devices")
-    print("└── Device Data: POST /api/iot/devices/{id}/data")
-
-def show_docker_commands():
-    """Mostra comandos Docker"""
-    print("\n🐳 COMANDOS DOCKER:")
-    print("├── Iniciar tudo: docker-compose up -d")
-    print("├── Ver logs: docker-compose logs -f")
-    print("├── Parar tudo: docker-compose down")
-    print("└── Rebuild: docker-compose up --build")
+    """Mostra informações essenciais"""
+    print("\n✅ Sistema iniciado com sucesso!")
+    print("🌐 API Principal: http://localhost:5001")
+    print("📊 Dashboard: http://localhost:5001/dashboard")
+    print("🔍 Health Check: http://localhost:5001/health")
+    print("\n📋 APIs disponíveis:")
+    print("  • Mobile: /api/mobile/*")
+    print("  • Java: /api/java/*")
+    print("  • .NET: /api/dotnet/*")
+    print("  • Database: /api/database/*")
+    print("  • IoT: /api/iot/*")
 
 def main():
     """Função principal"""
@@ -153,11 +113,6 @@ def main():
     
     # Mostra informações
     show_integration_info()
-    show_docker_commands()
-    
-    print("\n" + "="*60)
-    print("🎉 SISTEMA VISIONMOTO INTEGRADO INICIADO!")
-    print("="*60)
     print("\n💡 Pressione Ctrl+C para parar o sistema")
     
     try:

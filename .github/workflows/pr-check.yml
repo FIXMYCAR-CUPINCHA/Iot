@@ -174,7 +174,7 @@ ${success ?
         cat diff-analysis.md
     
     - name: Upload análise como artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: diff-analysis
         path: diff-analysis.md
@@ -246,7 +246,7 @@ except:
       continue-on-error: true
     
     - name: Upload relatório de segurança
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: security-report-pr

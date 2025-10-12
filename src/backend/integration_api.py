@@ -295,7 +295,7 @@ class VisionMotoIntegrationAPI:
     def _setup_routes(self):
         """Configura todas as rotas da API"""
 
-        # ============= ROTAS BÁSICAS =============
+        # Rotas básicas
         @self.app.route("/")
         def index():
             return jsonify(
@@ -320,7 +320,7 @@ class VisionMotoIntegrationAPI:
                 {"status": "healthy", "timestamp": datetime.now().isoformat()}
             )
 
-        # ============= MOBILE APP ENDPOINTS =============
+        # Mobile App endpoints
         @self.app.route("/api/mobile/auth/login", methods=["POST"])
         def mobile_login():
             try:
@@ -437,7 +437,7 @@ class VisionMotoIntegrationAPI:
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
-        # ============= JAVA INTEGRATION ENDPOINTS =============
+        # Java endpoints
         @self.app.route("/api/java/motos/status", methods=["GET"])
         def java_motos_status():
             """Endpoint para integração com Spring Boot"""
@@ -546,7 +546,7 @@ class VisionMotoIntegrationAPI:
                 except Exception as e:
                     return jsonify({"success": False, "error": str(e)}), 500
 
-        # ============= .NET INTEGRATION ENDPOINTS =============
+        # .NET endpoints
         @self.app.route("/api/dotnet/Dashboard/GetMotorcycleData", methods=["GET"])
         def dotnet_motorcycle_data():
             """Endpoint para integração com .NET (formato C#)"""
@@ -655,7 +655,7 @@ class VisionMotoIntegrationAPI:
             except Exception as e:
                 return jsonify({"IsSuccess": False, "Error": str(e)}), 500
 
-        # ============= DATABASE ENDPOINTS =============
+        # Database endpoints
         @self.app.route("/api/database/backup", methods=["POST"])
         def database_backup():
             """Cria backup do banco de dados"""
@@ -737,7 +737,7 @@ class VisionMotoIntegrationAPI:
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
 
-        # ============= IOT ENDPOINTS =============
+        # IoT endpoints
         @self.app.route("/api/iot/devices", methods=["GET"])
         def iot_devices():
             """Lista dispositivos IoT"""
@@ -788,7 +788,7 @@ class VisionMotoIntegrationAPI:
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
 
-        # ============= DASHBOARD ENDPOINT =============
+        # Dashboard
         @self.app.route("/dashboard")
         def dashboard():
             return send_from_directory(self.app.static_folder, "index.html")
