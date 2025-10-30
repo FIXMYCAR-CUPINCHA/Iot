@@ -277,15 +277,15 @@ class VisionMotoIntegrationAPI:
                     ),
                 ]
 
-            for moto in motos_exemplo:
-                cursor.execute(
-                    """
-                    INSERT INTO motos_patio 
-                    (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, endereco, setor, andar, vaga, descricao_localizacao, ultima_atualizacao)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                    (*moto, datetime.now().isoformat()),
-                )
+                for moto in motos_exemplo:
+                    cursor.execute(
+                        """
+                        INSERT INTO motos_patio 
+                        (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, endereco, setor, andar, vaga, descricao_localizacao, ultima_atualizacao)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        (*moto, datetime.now().isoformat()),
+                    )
 
             # Adiciona dispositivos IoT de exemplo
             cursor.execute("SELECT COUNT(*) FROM dispositivos_iot")
