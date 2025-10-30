@@ -1,8 +1,8 @@
-# VisionMoto v2.0 - Challenge 2025
+# VisionMoto - Challenge 2025
 
 Sistema integrado de detecção de motos com IoT e APIs multi-disciplinares.
 
-## 🚀 Execução Rápida
+## Execução Rápida
 
 ### Sistema Completo
 ```bash
@@ -19,7 +19,7 @@ python visionmoto.py demo
 python visionmoto.py backend
 ```
 
-## 🌐 APIs Disponíveis
+## APIs Disponíveis
 
 - **Mobile App**: `/api/mobile/*`
 - **Java/Spring**: `/api/java/*`
@@ -27,14 +27,14 @@ python visionmoto.py backend
 - **Database**: `/api/database/*`
 - **IoT**: `/api/iot/*`
 
-## 🛠️ Tecnologias
+## Tecnologias
 
 - **Backend**: Python Flask + SQLite
 - **Visão**: OpenCV + YOLO
 - **IoT**: MQTT + HTTP/REST
 - **DevOps**: Docker + GitHub Actions
 
-## 📋 Estrutura
+## Estrutura
 
 ```
 VisionMoto/
@@ -47,10 +47,10 @@ VisionMoto/
 └── .github/workflows/                # CI/CD
 ```
 
-## 👥 Equipe
+## Equipe
 
-- **Thomaz Oliveira Vilas Boas Bartol** - RM555323
 - **Vinicius Souza Carvalho** - RM556089
+- **Thomaz Oliveira Vilas Boas Bartol** - RM555323
 - **Gabriel Duarte** - RM556972
 
 **4º Sprint - Disruptive Architectures: IoT, IoB & Generative AI**

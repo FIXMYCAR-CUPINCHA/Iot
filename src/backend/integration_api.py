@@ -64,6 +64,11 @@ class VisionMotoIntegrationAPI:
                 localizacao_x REAL DEFAULT 0,
                 localizacao_y REAL DEFAULT 0,
                 zona TEXT DEFAULT 'A1',
+                endereco TEXT DEFAULT '',
+                setor TEXT DEFAULT '',
+                andar INTEGER DEFAULT 1,
+                vaga TEXT DEFAULT '',
+                descricao_localizacao TEXT DEFAULT '',
                 ultima_atualizacao TEXT,
                 em_uso_por TEXT,
                 manutencao_agendada TEXT
@@ -102,6 +107,30 @@ class VisionMotoIntegrationAPI:
                 criado_em TEXT,
                 resolvido_em TEXT,
                 resolvido_por TEXT
+            )
+        """
+        )
+
+        # Tabela para idempotência de eventos IoT
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS iot_eventos (
+                idempotency_key TEXT PRIMARY KEY,
+                alert_id TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """
+        )
+
+        # Tabela para tokens de push (mobile)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS push_devices (
+                token TEXT PRIMARY KEY,
+                user_id TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL,
+                last_seen TEXT
             )
         """
         )
@@ -154,7 +183,7 @@ class VisionMotoIntegrationAPI:
         try:
             cursor.execute("SELECT COUNT(*) FROM motos_patio")
             if cursor.fetchone()[0] == 0:
-                # Adiciona motos de exemplo
+                # Adiciona motos de exemplo com localização detalhada
                 motos_exemplo = [
                     (
                         "MOTO001",
@@ -165,6 +194,11 @@ class VisionMotoIntegrationAPI:
                         10.5,
                         20.3,
                         "A1",
+                        "Rua das Palmeiras, 123 - Setor A",
+                        "Setor A",
+                        1,
+                        "A1-001",
+                        "Próximo à entrada principal, primeira fileira",
                     ),
                     (
                         "MOTO002",
@@ -175,6 +209,11 @@ class VisionMotoIntegrationAPI:
                         15.2,
                         25.1,
                         "A2",
+                        "Rua das Palmeiras, 123 - Setor A",
+                        "Setor A",
+                        1,
+                        "A2-005",
+                        "Segunda fileira, próximo ao banheiro",
                     ),
                     (
                         "MOTO003",
@@ -185,6 +224,11 @@ class VisionMotoIntegrationAPI:
                         8.7,
                         18.9,
                         "A1",
+                        "Rua das Palmeiras, 123 - Setor A",
+                        "Setor A",
+                        1,
+                        "A1-003",
+                        "Primeira fileira, vaga coberta",
                     ),
                     (
                         "MOTO004",
@@ -195,6 +239,11 @@ class VisionMotoIntegrationAPI:
                         12.1,
                         22.4,
                         "B1",
+                        "Av. Industrial, 456 - Setor B",
+                        "Setor B",
+                        2,
+                        "B1-010",
+                        "Segundo andar, área de manutenção",
                     ),
                     (
                         "MOTO005",
@@ -205,6 +254,11 @@ class VisionMotoIntegrationAPI:
                         20.3,
                         30.2,
                         "B2",
+                        "Av. Industrial, 456 - Setor B",
+                        "Setor B",
+                        1,
+                        "B2-007",
+                        "Térreo, próximo ao elevador",
                     ),
                     (
                         "MOTO006",
@@ -215,6 +269,11 @@ class VisionMotoIntegrationAPI:
                         25.1,
                         35.8,
                         "C1",
+                        "Rua dos Motociclistas, 789 - Setor C",
+                        "Setor C",
+                        1,
+                        "C1-015",
+                        "Área VIP, vaga premium",
                     ),
                 ]
 
@@ -222,8 +281,8 @@ class VisionMotoIntegrationAPI:
                 cursor.execute(
                     """
                     INSERT INTO motos_patio 
-                    (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, ultima_atualizacao)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, endereco, setor, andar, vaga, descricao_localizacao, ultima_atualizacao)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     (*moto, datetime.now().isoformat()),
                 )
@@ -310,6 +369,11 @@ class VisionMotoIntegrationAPI:
                         "database": "/api/database/*",
                         "iot": "/api/iot/*",
                         "dashboard": "/dashboard",
+                        "busca_por_placa": {
+                            "mobile": "/api/mobile/motos/buscar/<placa>",
+                            "java": "/api/java/motos/buscar/<placa>",
+                            "dotnet": "/api/dotnet/Motorcycles/FindByPlate/<placa>"
+                        }
                     },
                 }
             )
@@ -366,7 +430,10 @@ class VisionMotoIntegrationAPI:
 
                 cursor.execute(
                     """
-                    SELECT id, modelo, placa, status, bateria, zona, ultima_atualizacao
+                    SELECT 
+                        id, modelo, placa, status, bateria, zona, 
+                        endereco, setor, andar, vaga, descricao_localizacao,
+                        ultima_atualizacao
                     FROM motos_patio 
                     WHERE status IN ('disponivel', 'em_uso')
                     ORDER BY status, bateria DESC
@@ -385,6 +452,67 @@ class VisionMotoIntegrationAPI:
                         ),
                     }
                 )
+
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/mobile/motos/buscar/<placa>", methods=["GET"])
+        def mobile_buscar_moto_por_placa(placa):
+            """Busca moto específica por placa com localização detalhada"""
+            try:
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id, modelo, placa, status, bateria, 
+                        localizacao_x, localizacao_y, zona,
+                        endereco, setor, andar, vaga, descricao_localizacao,
+                        ultima_atualizacao, em_uso_por
+                    FROM motos_patio 
+                    WHERE placa = ? COLLATE NOCASE
+                """,
+                    (placa,),
+                )
+
+                moto = cursor.fetchone()
+                conn.close()
+
+                if not moto:
+                    return jsonify({"error": f"Moto com placa {placa} não encontrada"}), 404
+
+                moto_dict = dict(moto)
+                
+                # Adiciona informações de localização formatadas
+                moto_dict["localizacao_completa"] = {
+                    "endereco": moto_dict["endereco"],
+                    "setor": moto_dict["setor"],
+                    "andar": moto_dict["andar"],
+                    "vaga": moto_dict["vaga"],
+                    "descricao": moto_dict["descricao_localizacao"],
+                    "coordenadas": {
+                        "x": moto_dict["localizacao_x"],
+                        "y": moto_dict["localizacao_y"]
+                    },
+                    "zona": moto_dict["zona"]
+                }
+
+                # Instrução de como chegar
+                instrucoes = f"Para encontrar a moto {placa}:\n"
+                instrucoes += f"📍 Endereço: {moto_dict['endereco']}\n"
+                instrucoes += f"🏢 {moto_dict['setor']} - {moto_dict['andar']}º andar\n"
+                instrucoes += f"🅿️ Vaga: {moto_dict['vaga']}\n"
+                instrucoes += f"ℹ️ {moto_dict['descricao_localizacao']}"
+                
+                moto_dict["instrucoes_localizacao"] = instrucoes
+
+                return jsonify({
+                    "moto": moto_dict,
+                    "encontrada": True,
+                    "timestamp": datetime.now().isoformat()
+                })
 
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
@@ -457,6 +585,11 @@ class VisionMotoIntegrationAPI:
                         localizacao_x as latitude,
                         localizacao_y as longitude,
                         zona,
+                        endereco,
+                        setor,
+                        andar,
+                        vaga,
+                        descricao_localizacao as descricaoLocalizacao,
                         ultima_atualizacao as ultimaAtualizacao
                     FROM motos_patio
                 """
@@ -485,6 +618,84 @@ class VisionMotoIntegrationAPI:
                 }
 
                 return jsonify(response)
+
+            except Exception as e:
+                return jsonify({"success": False, "error": str(e)}), 500
+
+        @self.app.route("/api/java/motos/buscar/<placa>", methods=["GET"])
+        def java_buscar_moto_por_placa(placa):
+            """Busca moto específica por placa - Endpoint Java/Spring Boot"""
+            try:
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id as motoId,
+                        modelo,
+                        placa,
+                        status,
+                        bateria as nivelBateria,
+                        localizacao_x as latitude,
+                        localizacao_y as longitude,
+                        zona,
+                        endereco,
+                        setor,
+                        andar,
+                        vaga,
+                        descricao_localizacao as descricaoLocalizacao,
+                        ultima_atualizacao as ultimaAtualizacao,
+                        em_uso_por as emUsoPor
+                    FROM motos_patio 
+                    WHERE placa = ? COLLATE NOCASE
+                """,
+                    (placa,),
+                )
+
+                moto = cursor.fetchone()
+                conn.close()
+
+                if not moto:
+                    return jsonify({
+                        "success": False,
+                        "error": f"Moto com placa {placa} não encontrada",
+                        "timestamp": datetime.now().isoformat()
+                    }), 404
+
+                moto_dict = dict(moto)
+                
+                # Adiciona localização formatada para Java
+                moto_dict["localizacaoCompleta"] = {
+                    "endereco": moto_dict["endereco"],
+                    "setor": moto_dict["setor"],
+                    "andar": moto_dict["andar"],
+                    "vaga": moto_dict["vaga"],
+                    "descricao": moto_dict["descricaoLocalizacao"],
+                    "coordenadas": {
+                        "latitude": moto_dict["latitude"],
+                        "longitude": moto_dict["longitude"]
+                    },
+                    "zona": moto_dict["zona"]
+                }
+
+                # Instruções de localização
+                moto_dict["instrucoesLocalizacao"] = [
+                    f"Endereço: {moto_dict['endereco']}",
+                    f"Setor: {moto_dict['setor']} - {moto_dict['andar']}º andar",
+                    f"Vaga: {moto_dict['vaga']}",
+                    f"Referência: {moto_dict['descricaoLocalizacao']}"
+                ]
+
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "moto": moto_dict,
+                        "encontrada": True
+                    },
+                    "timestamp": datetime.now().isoformat()
+                })
 
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
@@ -566,6 +777,11 @@ class VisionMotoIntegrationAPI:
                         localizacao_x as LocationX,
                         localizacao_y as LocationY,
                         zona as Zone,
+                        endereco as Address,
+                        setor as Sector,
+                        andar as Floor,
+                        vaga as ParkingSpot,
+                        descricao_localizacao as LocationDescription,
                         ultima_atualizacao as LastUpdate
                     FROM motos_patio
                 """
@@ -609,6 +825,90 @@ class VisionMotoIntegrationAPI:
                     ),
                     500,
                 )
+
+        @self.app.route("/api/dotnet/Motorcycles/FindByPlate/<placa>", methods=["GET"])
+        def dotnet_buscar_moto_por_placa(placa):
+            """Busca moto específica por placa - Endpoint .NET"""
+            try:
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id as Id,
+                        modelo as Model,
+                        placa as LicensePlate,
+                        status as Status,
+                        bateria as BatteryLevel,
+                        localizacao_x as LocationX,
+                        localizacao_y as LocationY,
+                        zona as Zone,
+                        endereco as Address,
+                        setor as Sector,
+                        andar as Floor,
+                        vaga as ParkingSpot,
+                        descricao_localizacao as LocationDescription,
+                        ultima_atualizacao as LastUpdate,
+                        em_uso_por as InUseBy
+                    FROM motos_patio 
+                    WHERE placa = ? COLLATE NOCASE
+                """,
+                    (placa,),
+                )
+
+                motorcycle = cursor.fetchone()
+                conn.close()
+
+                if not motorcycle:
+                    return jsonify({
+                        "IsSuccess": False,
+                        "Error": f"Motorcycle with plate {placa} not found",
+                        "Message": "Motorcycle not found in database",
+                        "Timestamp": datetime.now().isoformat()
+                    }), 404
+
+                motorcycle_dict = dict(motorcycle)
+                
+                # Adiciona localização formatada para .NET
+                motorcycle_dict["LocationDetails"] = {
+                    "Address": motorcycle_dict["Address"],
+                    "Sector": motorcycle_dict["Sector"],
+                    "Floor": motorcycle_dict["Floor"],
+                    "ParkingSpot": motorcycle_dict["ParkingSpot"],
+                    "Description": motorcycle_dict["LocationDescription"],
+                    "Coordinates": {
+                        "X": motorcycle_dict["LocationX"],
+                        "Y": motorcycle_dict["LocationY"]
+                    },
+                    "Zone": motorcycle_dict["Zone"]
+                }
+
+                # Instruções de localização
+                motorcycle_dict["LocationInstructions"] = [
+                    f"Address: {motorcycle_dict['Address']}",
+                    f"Sector: {motorcycle_dict['Sector']} - Floor {motorcycle_dict['Floor']}",
+                    f"Parking Spot: {motorcycle_dict['ParkingSpot']}",
+                    f"Reference: {motorcycle_dict['LocationDescription']}"
+                ]
+
+                return jsonify({
+                    "IsSuccess": True,
+                    "Data": {
+                        "Motorcycle": motorcycle_dict,
+                        "Found": True
+                    },
+                    "Message": "Motorcycle found successfully",
+                    "Timestamp": datetime.now().isoformat()
+                })
+
+            except Exception as e:
+                return jsonify({
+                    "IsSuccess": False,
+                    "Error": str(e),
+                    "Message": "Failed to find motorcycle"
+                }), 500
 
         @self.app.route("/api/dotnet/Reports/GenerateUsageReport", methods=["POST"])
         def dotnet_usage_report():
@@ -738,6 +1038,69 @@ class VisionMotoIntegrationAPI:
                 return jsonify({"success": False, "error": str(e)}), 500
 
         # IoT endpoints
+        @self.app.route("/api/iot/eventos", methods=["POST"])
+        def iot_eventos():
+            """Recebe eventos IoT e cria/atualiza alerta com idempotência"""
+            try:
+                data = request.get_json() or {}
+                idem = request.headers.get("Idempotency-Key") or data.get("id")
+                if not idem:
+                    return jsonify({"error": "Idempotency-Key obrigatório"}), 400
+
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+
+                # Idempotência: já existe?
+                cursor.execute(
+                    "SELECT alert_id FROM iot_eventos WHERE idempotency_key = ?",
+                    (idem,),
+                )
+                row = cursor.fetchone()
+                if row:
+                    alert_id = row[0]
+                    conn.close()
+                    return (
+                        jsonify({"alertId": alert_id, "status": "OPEN", "idempotent": True}),
+                        200,
+                    )
+
+                # Cria alerta
+                alert_id = f"ALR-{datetime.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+                titulo = "Moto fora da vaga" if data.get("type") else "Alerta IoT"
+                descricao = (
+                    f"Dispositivo {data.get('deviceId','desconhecido')} detectou irregularidade"
+                )
+
+                cursor.execute(
+                    """
+                    INSERT INTO alertas (id, tipo, severidade, titulo, descricao, moto_id, zona, ativo, criado_em)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+                    """,
+                    (
+                        alert_id,
+                        data.get("type", "iot"),
+                        "HIGH" if data.get("type") else "info",
+                        titulo,
+                        descricao,
+                        None,
+                        (data.get("metadata") or {}).get("slot"),
+                        datetime.now().isoformat(),
+                    ),
+                )
+
+                # Registra idempotência
+                cursor.execute(
+                    "INSERT INTO iot_eventos (idempotency_key, alert_id, created_at) VALUES (?, ?, ?)",
+                    (idem, alert_id, datetime.now().isoformat()),
+                )
+
+                conn.commit()
+                conn.close()
+
+                return jsonify({"alertId": alert_id, "status": "OPEN"}), 201
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
         @self.app.route("/api/iot/devices", methods=["GET"])
         def iot_devices():
             """Lista dispositivos IoT"""
@@ -787,6 +1150,106 @@ class VisionMotoIntegrationAPI:
 
             except Exception as e:
                 return jsonify({"success": False, "error": str(e)}), 500
+
+        # Mobile alert endpoints (consumidos pelo app)
+        @self.app.route("/api/mobile/alertas", methods=["GET"])
+        def mobile_alertas_list():
+            try:
+                status = request.args.get("status", "OPEN").upper()
+                limit = int(request.args.get("limit", 50))
+                offset = int(request.args.get("offset", 0))
+
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                if status == "OPEN":
+                    cursor.execute(
+                        "SELECT * FROM alertas WHERE ativo = 1 ORDER BY criado_em DESC LIMIT ? OFFSET ?",
+                        (limit, offset),
+                    )
+                elif status == "RESOLVED":
+                    cursor.execute(
+                        "SELECT * FROM alertas WHERE ativo = 0 ORDER BY resolvido_em DESC LIMIT ? OFFSET ?",
+                        (limit, offset),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT * FROM alertas ORDER BY criado_em DESC LIMIT ? OFFSET ?",
+                        (limit, offset),
+                    )
+
+                items = []
+                for row in cursor.fetchall():
+                    d = dict(row)
+                    items.append(
+                        {
+                            "id": d["id"],
+                            "status": "OPEN" if d["ativo"] else "RESOLVED",
+                            "title": d["titulo"],
+                            "message": d.get("descricao"),
+                            "severity": d.get("severidade", "info").upper(),
+                            "deviceId": None,
+                            "createdAt": d.get("criado_em"),
+                            "location": {"lat": None, "lng": None},
+                        }
+                    )
+
+                conn.close()
+                return jsonify({"items": items, "total": len(items)})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/mobile/alertas/<alert_id>/resolver", methods=["PATCH"])
+        def mobile_alertas_resolver(alert_id):
+            try:
+                data = request.get_json() or {}
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    UPDATE alertas SET ativo = 0, resolvido_em = ?, resolvido_por = ?
+                    WHERE id = ? AND ativo = 1
+                    """,
+                    (datetime.now().isoformat(), data.get("resolvedBy"), alert_id),
+                )
+                if cursor.rowcount == 0:
+                    conn.close()
+                    return jsonify({"error": "Alerta não encontrado ou já resolvido"}), 404
+                conn.commit()
+                conn.close()
+                return jsonify({"id": alert_id, "status": "RESOLVED", "updatedAt": datetime.now().isoformat()})
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        @self.app.route("/api/mobile/devices/register", methods=["POST"])
+        def mobile_devices_register():
+            try:
+                data = request.get_json() or {}
+                token = data.get("token")
+                if not token:
+                    return jsonify({"error": "token obrigatório"}), 400
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO push_devices (token, user_id, platform, created_at, last_seen)
+                    VALUES (?, ?, ?, COALESCE((SELECT created_at FROM push_devices WHERE token = ?), ?), ?)
+                    """,
+                    (
+                        token,
+                        data.get("userId"),
+                        data.get("platform", "android"),
+                        token,
+                        datetime.now().isoformat(),
+                        datetime.now().isoformat(),
+                    ),
+                )
+                conn.commit()
+                conn.close()
+                return jsonify({"ok": True})
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 500
 
         # Dashboard
         @self.app.route("/dashboard")
