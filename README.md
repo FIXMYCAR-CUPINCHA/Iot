@@ -73,11 +73,13 @@ Automatização completa do controle de pátios da Mottu através de visão comp
 - ✅ **Health Checks** - Monitoramento de saúde
 
 ### **3. 📊 Dashboard Interativo**
+- ✅ **Mapa Visual do Pátio** - Grid interativo com localização das motos
 - ✅ Visualização em tempo real
 - ✅ Estatísticas de ocupação
 - ✅ Histórico de movimentações
 - ✅ Alertas e notificações
 - ✅ Interface web responsiva
+- ✅ Clique em motos para ver detalhes completos
 
 ### **4. 🔗 Integração Multidisciplinar**
 - ✅ **Mobile App** - Dados para React Native

@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""
+Constantes do sistema VisionMoto
+Centraliza magic numbers e configurações
+"""
+
+# API Configuration
+DEFAULT_API_PORT = 5001
+DEFAULT_API_HOST = "0.0.0.0"
+API_STARTUP_DELAY_SECONDS = 2
+VISION_SYSTEM_STARTUP_DELAY_SECONDS = 3
+
+# Pagination
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 100
+MIN_PAGE_SIZE = 1
+
+# JWT Configuration
+JWT_EXPIRATION_HOURS = 24
+JWT_ALGORITHM = "HS256"
+
+# Database
+DEFAULT_DB_PATH = "visionmoto_integration.db"
+DB_CONNECTION_TIMEOUT = 30
+
+# Rate Limiting
+RATE_LIMIT_PER_MINUTE = 60
+RATE_LIMIT_PER_HOUR = 1000
+
+# Allowed Tables (SQL Injection Prevention)
+ALLOWED_TABLES = [
+    "motos_patio",
+    "usuarios",
+    "alertas",
+    "dispositivos_iot",
+    "historico_uso",
+    "detections",
+    "iot_eventos",
+    "push_devices"
+]
+
+# Alert Severities
+ALERT_SEVERITY_INFO = "info"
+ALERT_SEVERITY_LOW = "LOW"
+ALERT_SEVERITY_MEDIUM = "MEDIUM"
+ALERT_SEVERITY_HIGH = "HIGH"
+ALERT_SEVERITY_CRITICAL = "CRITICAL"
+
+VALID_ALERT_SEVERITIES = [
+    ALERT_SEVERITY_INFO,
+    ALERT_SEVERITY_LOW,
+    ALERT_SEVERITY_MEDIUM,
+    ALERT_SEVERITY_HIGH,
+    ALERT_SEVERITY_CRITICAL
+]
+
+# Alert Status
+ALERT_STATUS_OPEN = "OPEN"
+ALERT_STATUS_RESOLVED = "RESOLVED"
+ALERT_STATUS_ALL = "ALL"
+
+VALID_ALERT_STATUSES = [
+    ALERT_STATUS_OPEN,
+    ALERT_STATUS_RESOLVED,
+    ALERT_STATUS_ALL
+]
+
+# Moto Status
+MOTO_STATUS_DISPONIVEL = "disponivel"
+MOTO_STATUS_EM_USO = "em_uso"
+MOTO_STATUS_MANUTENCAO = "manutencao"
+
+VALID_MOTO_STATUSES = [
+    MOTO_STATUS_DISPONIVEL,
+    MOTO_STATUS_EM_USO,
+    MOTO_STATUS_MANUTENCAO
+]
+
+# CORS Origins (development)
+DEFAULT_CORS_ORIGINS = "http://localhost:3000,http://localhost:8080"
+
+# Retry Configuration
+MAX_RETRY_ATTEMPTS = 3
+RETRY_DELAY_SECONDS = 1
+
+# Health Check
+HEALTH_CHECK_INTERVAL_SECONDS = 30
+HEALTH_CHECK_TIMEOUT_SECONDS = 10
+
+# FPS History
+FPS_HISTORY_MAXLEN = 60
+
+# YOLO Configuration
+DEFAULT_YOLO_MODEL = "yolov8n.pt"
+DEFAULT_CONFIDENCE_THRESHOLD = 0.5
+
+# COCO Classes (Motos e Veículos)
+COCO_CLASS_BICYCLE = 1
+COCO_CLASS_CAR = 2
+COCO_CLASS_MOTORBIKE = 3
+COCO_CLASS_TRUCK = 7
+
+MOTO_RELATED_CLASSES = {
+    COCO_CLASS_MOTORBIKE: "motorbike",
+    COCO_CLASS_BICYCLE: "bicycle",
+    COCO_CLASS_CAR: "car",
+    COCO_CLASS_TRUCK: "truck",
+}

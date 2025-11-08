@@ -5,9 +5,17 @@ import argparse
 import time
 import json
 import requests
+import logging
 from datetime import datetime
 import threading
 from collections import deque
+
+# Configuração de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class MotoDetector:
@@ -90,7 +98,7 @@ class MotoDetector:
         }
 
     def send_to_backend(self, detections, frame_num, metrics):
-        """Envia dados para o backend"""
+        """Envia dados para o backend com tratamento adequado de erros"""
         for det in detections:
             try:
                 payload = {
@@ -107,8 +115,16 @@ class MotoDetector:
                 requests.post(
                     "http://localhost:5000/detections", json=payload, timeout=0.1
                 )
+            except requests.exceptions.Timeout:
+                # Timeout é esperado com timeout curto, não loga
+                continue
+            except requests.exceptions.ConnectionError:
+                # Backend pode não estar rodando, não é crítico
+                continue
             except Exception as e:
-                pass  # Ignora erros de comunicação
+                # Outros erros devem ser logados para debugging
+                logger.warning(f"Failed to send detection to backend: {type(e).__name__}: {e}")
+                continue
 
     def process_video(
         self,

@@ -51,6 +51,17 @@
             </div>
         </div>
         
+        <!-- Mapa Visual do Pátio -->
+        <div class="patio-map-section">
+            <h3>🗺️ Mapa do Pátio - Localização das Motos</h3>
+            <div class="patio-map-container">
+                <canvas id="patio-canvas"></canvas>
+            </div>
+            <p style="color: #94a3b8; font-size: 0.85rem; margin-top: 10px; text-align: center;">
+                💡 Clique em uma moto para ver detalhes completos
+            </p>
+        </div>
+        
         <div class="content-grid">
             <div class="main-content">
                 <h3>Últimas Detecções em Tempo Real</h3>
@@ -87,6 +98,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/static/patio-map.js"></script>
     <script src="/static/dashboard.js"></script>
 </body>
 </html>

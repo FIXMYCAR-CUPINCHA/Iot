@@ -1,296 +1,205 @@
 #!/usr/bin/env python3
 """
-Integration API - API REST refatorada para integração com outras disciplinas
-Versão 2.1 - Refatorada com serviços, rate limiting e tratamento de erros específico
+Integration API - API REST completa para integração com outras disciplinas
 Desenvolvido para o 4º Sprint - Challenge 2025
 """
 
 import os
 import sqlite3
 import json
-import logging
-from datetime import datetime, timezone
-from contextlib import contextmanager
-from typing import Optional
-
+import uuid
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from pydantic import ValidationError
-
-# Importa constantes
-from src.constants import (
-    DEFAULT_API_PORT,
-    DEFAULT_DB_PATH,
-    JWT_EXPIRATION_HOURS,
-    JWT_ALGORITHM,
-    DEFAULT_PAGE_SIZE,
-    MAX_PAGE_SIZE,
-    MIN_PAGE_SIZE,
-    VALID_ALERT_STATUSES,
-    ALERT_STATUS_OPEN,
-    ALERT_STATUS_RESOLVED,
-    RATE_LIMIT_PER_MINUTE,
-    RATE_LIMIT_PER_HOUR,
-    DEFAULT_CORS_ORIGINS,
-    ALLOWED_TABLES
-)
-
-# Importa serviços
-from src.services.moto_service import MotoService
-from src.services.alert_service import AlertService
-from src.services.auth_service import AuthService
-
-# Importa formatadores
-from src.formatters.mobile_formatter import MobileFormatter
-from src.formatters.java_formatter import JavaFormatter
-from src.formatters.dotnet_formatter import DotNetFormatter
-
-# Importa modelos
-from src.models.user import UserLogin
-
-
-# Configuração de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
 
 
 class VisionMotoIntegrationAPI:
-    """API REST refatorada para integração multi-disciplinar
-    
-    Usa serviços centralizados, formatadores específicos por cliente,
-    rate limiting, e tratamento de erros específico.
-    """
+    """API REST completa para integração multi-disciplinar"""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path="visionmoto_integration.db"):
         self.app = Flask(__name__, static_folder="static")
-        
-        # SECRET_KEY obrigatória em produção
-        secret_key = os.environ.get("SECRET_KEY")
-        debug_mode = os.environ.get("FLASK_ENV", "development") == "development"
-        
-        if not secret_key:
-            if not debug_mode:
-                raise RuntimeError(
-                    "SECRET_KEY environment variable must be set in production! "
-                    "Set it in your .env file or environment."
-                )
-            # Apenas em desenvolvimento, usa chave fixa para não invalidar tokens
-            secret_key = "dev-secret-key-change-in-production-12345678"
-            logger.warning(
-                "⚠️  Using development SECRET_KEY. Set SECRET_KEY env var for production!"
-            )
-        
-        self.app.config["SECRET_KEY"] = secret_key
-        self.db_path = db_path or os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
+        self.app.config["SECRET_KEY"] = "visionmoto-challenge-2025"
+        self.db_path = db_path
 
-        # CORS configurado com origens específicas
-        allowed_origins = os.environ.get(
-            "CORS_ORIGINS",
-            DEFAULT_CORS_ORIGINS if debug_mode else ""
-        ).split(",")
-        
-        CORS(self.app, resources={
-            r"/api/*": {
-                "origins": allowed_origins if allowed_origins != [''] else "*",
-                "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization", "Idempotency-Key"],
-                "expose_headers": ["Content-Type", "Authorization"],
-                "supports_credentials": True,
-                "max_age": 3600
-            }
-        })
-
-        # Rate Limiting
-        self.limiter = Limiter(
-            app=self.app,
-            key_func=get_remote_address,
-            default_limits=[f"{RATE_LIMIT_PER_MINUTE}/minute", f"{RATE_LIMIT_PER_HOUR}/hour"],
-            storage_uri="memory://"
-        )
-
-        # Inicializa serviços
-        self.moto_service = MotoService(self.db_path)
-        self.alert_service = AlertService(self.db_path)
-        self.auth_service = AuthService(self.db_path, secret_key)
+        # Habilita CORS para integração com apps mobile e web
+        CORS(self.app)
 
         self._init_database()
         self._setup_routes()
 
-    @contextmanager
-    def get_db_connection(self):
-        """Context manager para conexões de banco de dados"""
-        conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        try:
-            yield conn
-        except Exception as e:
-            conn.rollback()
-            logger.error(f"Database error: {e}", exc_info=True)
-            raise
-        finally:
-            conn.close()
-    
-    def _validate_table_name(self, table_name: str) -> bool:
-        """Valida nome de tabela para prevenir SQL injection"""
-        return table_name in ALLOWED_TABLES and table_name.replace("_", "").isalnum()
-    
     def _init_database(self):
         """Inicializa banco de dados com tabelas para integração"""
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-            # Tabela de detecções (existente)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS detections (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    created_at TEXT NOT NULL,
-                    frame INTEGER,
-                    class_name TEXT,
-                    confidence REAL,
-                    bbox TEXT,
-                    fps REAL,
-                    location_x REAL DEFAULT 0,
-                    location_y REAL DEFAULT 0,
-                    zone_id TEXT DEFAULT 'A1'
-                )
-            """)
+        # Tabela de detecções (existente)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS detections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                frame INTEGER,
+                class_name TEXT,
+                confidence REAL,
+                bbox TEXT,
+                fps REAL,
+                location_x REAL DEFAULT 0,
+                location_y REAL DEFAULT 0,
+                zone_id TEXT DEFAULT 'A1'
+            )
+        """
+        )
 
-            # Tabela de motos no pátio
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS motos_patio (
-                    id TEXT PRIMARY KEY,
-                    modelo TEXT,
-                    placa TEXT,
-                    status TEXT DEFAULT 'disponivel',
-                    bateria INTEGER DEFAULT 100,
-                    localizacao_x REAL DEFAULT 0,
-                    localizacao_y REAL DEFAULT 0,
-                    zona TEXT DEFAULT 'A1',
-                    endereco TEXT DEFAULT '',
-                    setor TEXT DEFAULT '',
-                    andar INTEGER DEFAULT 1,
-                    vaga TEXT DEFAULT '',
-                    descricao_localizacao TEXT DEFAULT '',
-                    ultima_atualizacao TEXT,
-                    em_uso_por TEXT,
-                    manutencao_agendada TEXT
-                )
-            """)
+        # Tabela de motos no pátio
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS motos_patio (
+                id TEXT PRIMARY KEY,
+                modelo TEXT,
+                placa TEXT,
+                status TEXT DEFAULT 'disponivel',
+                bateria INTEGER DEFAULT 100,
+                localizacao_x REAL DEFAULT 0,
+                localizacao_y REAL DEFAULT 0,
+                zona TEXT DEFAULT 'A1',
+                endereco TEXT DEFAULT '',
+                setor TEXT DEFAULT '',
+                andar INTEGER DEFAULT 1,
+                vaga TEXT DEFAULT '',
+                descricao_localizacao TEXT DEFAULT '',
+                ultima_atualizacao TEXT,
+                em_uso_por TEXT,
+                manutencao_agendada TEXT
+            )
+        """
+        )
 
-            # Tabela de usuários (para mobile app)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS usuarios (
-                    id TEXT PRIMARY KEY,
-                    nome TEXT NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    senha_hash TEXT NOT NULL,
-                    tipo TEXT DEFAULT 'usuario',
-                    criado_em TEXT,
-                    ultimo_acesso TEXT,
-                    ativo BOOLEAN DEFAULT 1
-                )
-            """)
+        # Tabela de usuários (para mobile app)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id TEXT PRIMARY KEY,
+                nome TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                senha_hash TEXT NOT NULL,
+                tipo TEXT DEFAULT 'usuario',
+                criado_em TEXT,
+                ultimo_acesso TEXT,
+                ativo BOOLEAN DEFAULT 1
+            )
+        """
+        )
 
-            # Tabela de alertas
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS alertas (
-                    id TEXT PRIMARY KEY,
-                    tipo TEXT NOT NULL,
-                    severidade TEXT DEFAULT 'info',
-                    titulo TEXT NOT NULL,
-                    descricao TEXT,
-                    moto_id TEXT,
-                    zona TEXT,
-                    ativo BOOLEAN DEFAULT 1,
-                    criado_em TEXT,
-                    resolvido_em TEXT,
-                    resolvido_por TEXT
-                )
-            """)
+        # Tabela de alertas
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS alertas (
+                id TEXT PRIMARY KEY,
+                tipo TEXT NOT NULL,
+                severidade TEXT DEFAULT 'info',
+                titulo TEXT NOT NULL,
+                descricao TEXT,
+                moto_id TEXT,
+                zona TEXT,
+                ativo BOOLEAN DEFAULT 1,
+                criado_em TEXT,
+                resolvido_em TEXT,
+                resolvido_por TEXT
+            )
+        """
+        )
 
-            # Tabela para idempotência de eventos IoT
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS iot_eventos (
-                    idempotency_key TEXT PRIMARY KEY,
-                    alert_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                )
-            """)
+        # Tabela para idempotência de eventos IoT
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS iot_eventos (
+                idempotency_key TEXT PRIMARY KEY,
+                alert_id TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """
+        )
 
-            # Tabela para tokens de push (mobile)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS push_devices (
-                    token TEXT PRIMARY KEY,
-                    user_id TEXT,
-                    platform TEXT,
-                    created_at TEXT NOT NULL,
-                    last_seen TEXT
-                )
-            """)
+        # Tabela para tokens de push (mobile)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS push_devices (
+                token TEXT PRIMARY KEY,
+                user_id TEXT,
+                platform TEXT,
+                created_at TEXT NOT NULL,
+                last_seen TEXT
+            )
+        """
+        )
 
-            # Tabela de dispositivos IoT
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS dispositivos_iot (
-                    id TEXT PRIMARY KEY,
-                    nome TEXT NOT NULL,
-                    tipo TEXT NOT NULL,
-                    status TEXT DEFAULT 'online',
-                    localizacao TEXT,
-                    ultima_comunicacao TEXT,
-                    dados_sensor TEXT,
-                    configuracao TEXT
-                )
-            """)
+        # Tabela de dispositivos IoT
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dispositivos_iot (
+                id TEXT PRIMARY KEY,
+                nome TEXT NOT NULL,
+                tipo TEXT NOT NULL,
+                status TEXT DEFAULT 'online',
+                localizacao TEXT,
+                ultima_comunicacao TEXT,
+                dados_sensor TEXT,
+                configuracao TEXT
+            )
+        """
+        )
 
-            # Tabela de histórico de uso
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS historico_uso (
-                    id TEXT PRIMARY KEY,
-                    moto_id TEXT NOT NULL,
-                    usuario_id TEXT,
-                    inicio_uso TEXT,
-                    fim_uso TEXT,
-                    localizacao_inicial TEXT,
-                    localizacao_final TEXT,
-                    distancia_percorrida REAL DEFAULT 0,
-                    tempo_uso INTEGER DEFAULT 0
-                )
-            """)
+        # Tabela de histórico de uso
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS historico_uso (
+                id TEXT PRIMARY KEY,
+                moto_id TEXT NOT NULL,
+                usuario_id TEXT,
+                inicio_uso TEXT,
+                fim_uso TEXT,
+                localizacao_inicial TEXT,
+                localizacao_final TEXT,
+                distancia_percorrida REAL DEFAULT 0,
+                tempo_uso INTEGER DEFAULT 0
+            )
+        """
+        )
+
+        conn.commit()
+        conn.close()
 
         # Popula dados iniciais se necessário
         self._populate_initial_data()
 
     def _populate_initial_data(self):
         """Popula dados iniciais para demonstração"""
-        with self.get_db_connection() as conn:
-            cursor = conn.cursor()
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-            # Verifica se já existem motos
-            try:
-                cursor.execute("SELECT COUNT(*) FROM motos_patio")
-                if cursor.fetchone()[0] == 0:
-                    # Adiciona motos de exemplo com localização detalhada
-                    motos_exemplo = [
-                        (
-                            "MOTO001",
-                            "Honda CG 160",
-                            "ABC-1234",
-                            "disponivel",
-                            95,
-                            10.5,
-                            20.3,
-                            "A1",
-                            "Rua das Palmeiras, 123 - Setor A",
-                            "Setor A",
-                            1,
-                            "A1-001",
-                            "Próximo à entrada principal, primeira fileira",
-                        ),
+        # Verifica se já existem motos
+        try:
+            cursor.execute("SELECT COUNT(*) FROM motos_patio")
+            if cursor.fetchone()[0] == 0:
+                # Adiciona motos de exemplo com localização detalhada
+                motos_exemplo = [
+                    (
+                        "MOTO001",
+                        "Honda CG 160",
+                        "ABC-1234",
+                        "disponivel",
+                        95,
+                        10.5,
+                        20.3,
+                        "A1",
+                        "Rua das Palmeiras, 123 - Setor A",
+                        "Setor A",
+                        1,
+                        "A1-001",
+                        "Próximo à entrada principal, primeira fileira",
+                    ),
                     (
                         "MOTO002",
                         "Yamaha Factor",
@@ -368,34 +277,79 @@ class VisionMotoIntegrationAPI:
                     ),
                 ]
 
-                    for moto in motos_exemplo:
-                        cursor.execute("""
-                            INSERT INTO motos_patio 
-                            (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, endereco, setor, andar, vaga, descricao_localizacao, ultima_atualizacao)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (*moto, datetime.now(timezone.utc).isoformat()))
+                for moto in motos_exemplo:
+                    cursor.execute(
+                        """
+                        INSERT INTO motos_patio 
+                        (id, modelo, placa, status, bateria, localizacao_x, localizacao_y, zona, endereco, setor, andar, vaga, descricao_localizacao, ultima_atualizacao)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                        (*moto, datetime.now().isoformat()),
+                    )
 
-                # Adiciona dispositivos IoT de exemplo
-                cursor.execute("SELECT COUNT(*) FROM dispositivos_iot")
-                if cursor.fetchone()[0] == 0:
-                    dispositivos = [
-                        ("SENSOR001", "Sensor de Movimento A1", "sensor_movimento", "online", "Zona A1"),
-                        ("SENSOR002", "Sensor de Movimento A2", "sensor_movimento", "online", "Zona A2"),
-                        ("SENSOR003", "Sensor de Movimento B1", "sensor_movimento", "offline", "Zona B1"),
-                        ("CAMERA001", "Câmera Principal", "camera", "online", "Entrada Principal"),
-                        ("LOCK001", "Trava Inteligente A1", "atuador_trava", "online", "Zona A1"),
-                        ("ALARM001", "Sistema de Alarme", "atuador_alarme", "online", "Central"),
-                    ]
+            # Adiciona dispositivos IoT de exemplo
+            cursor.execute("SELECT COUNT(*) FROM dispositivos_iot")
+            if cursor.fetchone()[0] == 0:
+                dispositivos = [
+                    (
+                        "SENSOR001",
+                        "Sensor de Movimento A1",
+                        "sensor_movimento",
+                        "online",
+                        "Zona A1",
+                    ),
+                    (
+                        "SENSOR002",
+                        "Sensor de Movimento A2",
+                        "sensor_movimento",
+                        "online",
+                        "Zona A2",
+                    ),
+                    (
+                        "SENSOR003",
+                        "Sensor de Movimento B1",
+                        "sensor_movimento",
+                        "offline",
+                        "Zona B1",
+                    ),
+                    (
+                        "CAMERA001",
+                        "Câmera Principal",
+                        "camera",
+                        "online",
+                        "Entrada Principal",
+                    ),
+                    (
+                        "LOCK001",
+                        "Trava Inteligente A1",
+                        "atuador_trava",
+                        "online",
+                        "Zona A1",
+                    ),
+                    (
+                        "ALARM001",
+                        "Sistema de Alarme",
+                        "atuador_alarme",
+                        "online",
+                        "Central",
+                    ),
+                ]
 
-                    for dispositivo in dispositivos:
-                        cursor.execute("""
-                            INSERT INTO dispositivos_iot 
-                            (id, nome, tipo, status, localizacao, ultima_comunicacao)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                        """, (*dispositivo, datetime.now(timezone.utc).isoformat()))
-            except sqlite3.Error as e:
-                # Se houver erro (ex: tabelas não existem), ignora
-                logger.warning(f"Error populating initial data: {e}")
+                for dispositivo in dispositivos:
+                    cursor.execute(
+                        """
+                        INSERT INTO dispositivos_iot 
+                        (id, nome, tipo, status, localizacao, ultima_comunicacao)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (*dispositivo, datetime.now().isoformat()),
+                    )
+        except sqlite3.Error:
+            # Se houver erro (ex: tabelas não existem), ignora
+            pass
+
+        conn.commit()
+        conn.close()
 
     def _setup_routes(self):
         """Configura todas as rotas da API"""
@@ -403,10 +357,11 @@ class VisionMotoIntegrationAPI:
         # Rotas básicas
         @self.app.route("/")
         def index():
-            return jsonify({
-                "service": "VisionMoto Integration API",
-                "version": "2.1-refactored",
-                "status": "running",
+            return jsonify(
+                {
+                    "service": "VisionMoto Integration API",
+                    "version": "2.0",
+                    "status": "running",
                     "endpoints": {
                         "mobile": "/api/mobile/*",
                         "java": "/api/java/*",
@@ -426,138 +381,324 @@ class VisionMotoIntegrationAPI:
         @self.app.route("/health")
         def health():
             return jsonify(
-                {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+                {"status": "healthy", "timestamp": datetime.now().isoformat()}
             )
 
-        # ==================== MOBILE ENDPOINTS ====================
+        # Mobile App endpoints
         @self.app.route("/api/mobile/auth/login", methods=["POST"])
-        @self.limiter.limit("10/minute")
         def mobile_login():
-            """Endpoint de login para mobile - USA AuthService"""
             try:
                 data = request.get_json()
-                if not data:
-                    return jsonify({"error": "Invalid JSON payload"}), 400
-                
-                # Validação com Pydantic
-                try:
-                    login_data = UserLogin(**data)
-                except ValidationError as e:
-                    logger.warning(f"Validation error in login: {e}")
-                    return jsonify({"error": "Invalid email or password format"}), 400
-                
-                # USA O SERVIÇO DE AUTENTICAÇÃO
-                result = self.auth_service.authenticate(login_data.email, login_data.senha)
-                
-                if not result:
-                    return jsonify({"error": "Invalid credentials"}), 401
-                
-                logger.info(f"Login successful for email: {login_data.email}")
-                return jsonify(result), 200
-                
-            except json.JSONDecodeError:
-                logger.warning("Invalid JSON in login request")
-                return jsonify({"error": "Invalid JSON format"}), 400
-            except ValueError as e:
-                logger.warning(f"Login validation error: {e}")
-                return jsonify({"error": str(e)}), 400
+                email = data.get("email")
+                senha = data.get("senha")
+
+                # Validação básica
+                if not email or not senha:
+                    return jsonify({"error": "Email e senha obrigatórios"}), 400
+
+                # Busca usuário (implementação simplificada)
+                user_data = {
+                    "id": str(uuid.uuid4()),
+                    "nome": "Usuário Demo",
+                    "email": email,
+                    "tipo": "usuario",
+                }
+
+                # Gera token JWT
+                token = jwt.encode(
+                    {
+                        "user_id": user_data["id"],
+                        "email": email,
+                        "exp": datetime.now().timestamp() + (24 * 3600),
+                    },
+                    self.app.config["SECRET_KEY"],
+                    algorithm="HS256",
+                )
+
+                return jsonify({"token": token, "user": user_data, "expires_in": 86400})
+
             except Exception as e:
-                logger.error(f"Unexpected login error: {e}", exc_info=True)
-                return jsonify({"error": "Authentication failed. Please try again."}), 500
+                return jsonify({"error": str(e)}), 500
 
         @self.app.route("/api/mobile/motos", methods=["GET"])
         def mobile_motos():
-            """Lista motos disponíveis para o app mobile - USA MotoService"""
+            """Lista motos disponíveis para o app mobile"""
             try:
-                motos = self.moto_service.get_all_motos(status_filter=['disponivel', 'em_uso'])
-                return jsonify(MobileFormatter.format_moto_list(motos)), 200
-            except sqlite3.Error as e:
-                logger.error(f"Database error listing motos: {e}", exc_info=True)
-                return jsonify({"error": "Database error"}), 503
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id, modelo, placa, status, bateria, zona, 
+                        endereco, setor, andar, vaga, descricao_localizacao,
+                        ultima_atualizacao
+                    FROM motos_patio 
+                    WHERE status IN ('disponivel', 'em_uso')
+                    ORDER BY status, bateria DESC
+                """
+                )
+
+                motos = [dict(row) for row in cursor.fetchall()]
+                conn.close()
+
+                return jsonify(
+                    {
+                        "motos": motos,
+                        "total": len(motos),
+                        "disponiveis": len(
+                            [m for m in motos if m["status"] == "disponivel"]
+                        ),
+                    }
+                )
+
             except Exception as e:
-                logger.error(f"Unexpected error listing motos: {e}", exc_info=True)
-                return jsonify({"error": "Failed to retrieve motorcycles"}), 500
+                return jsonify({"error": str(e)}), 500
 
         @self.app.route("/api/mobile/motos/buscar/<placa>", methods=["GET"])
         def mobile_buscar_moto_por_placa(placa):
-            """Busca moto por placa - USA MotoService (SEM DUPLICAÇÃO)"""
+            """Busca moto específica por placa com localização detalhada"""
             try:
-                moto = self.moto_service.find_by_placa(placa)
-                
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id, modelo, placa, status, bateria, 
+                        localizacao_x, localizacao_y, zona,
+                        endereco, setor, andar, vaga, descricao_localizacao,
+                        ultima_atualizacao, em_uso_por
+                    FROM motos_patio 
+                    WHERE placa = ? COLLATE NOCASE
+                """,
+                    (placa,),
+                )
+
+                moto = cursor.fetchone()
+                conn.close()
+
                 if not moto:
                     return jsonify({"error": f"Moto com placa {placa} não encontrada"}), 404
+
+                moto_dict = dict(moto)
                 
-                return jsonify(MobileFormatter.format_moto_detail(moto)), 200
-            except sqlite3.Error as e:
-                logger.error(f"Database error finding moto: {e}", exc_info=True)
-                return jsonify({"error": "Database error"}), 503
+                # Adiciona informações de localização formatadas
+                moto_dict["localizacao_completa"] = {
+                    "endereco": moto_dict["endereco"],
+                    "setor": moto_dict["setor"],
+                    "andar": moto_dict["andar"],
+                    "vaga": moto_dict["vaga"],
+                    "descricao": moto_dict["descricao_localizacao"],
+                    "coordenadas": {
+                        "x": moto_dict["localizacao_x"],
+                        "y": moto_dict["localizacao_y"]
+                    },
+                    "zona": moto_dict["zona"]
+                }
+
+                # Instrução de como chegar
+                instrucoes = f"Para encontrar a moto {placa}:\n"
+                instrucoes += f"📍 Endereço: {moto_dict['endereco']}\n"
+                instrucoes += f"🏢 {moto_dict['setor']} - {moto_dict['andar']}º andar\n"
+                instrucoes += f"🅿️ Vaga: {moto_dict['vaga']}\n"
+                instrucoes += f"ℹ️ {moto_dict['descricao_localizacao']}"
+                
+                moto_dict["instrucoes_localizacao"] = instrucoes
+
+                return jsonify({
+                    "moto": moto_dict,
+                    "encontrada": True,
+                    "timestamp": datetime.now().isoformat()
+                })
+
             except Exception as e:
-                logger.error(f"Unexpected error finding moto: {e}", exc_info=True)
-                return jsonify({"error": "Failed to find motorcycle"}), 500
+                return jsonify({"error": str(e)}), 500
 
         @self.app.route("/api/mobile/motos/<moto_id>/reservar", methods=["POST"])
         def mobile_reservar_moto(moto_id):
-            """Reserva uma moto - USA MotoService"""
+            """Reserva uma moto via app mobile"""
             try:
-                data = request.get_json() or {}
+                data = request.get_json()
                 usuario_id = data.get("usuario_id")
-                
-                if not usuario_id:
-                    return jsonify({"error": "usuario_id é obrigatório"}), 400
-                
-                self.moto_service.reservar_moto(moto_id, usuario_id)
-                
-                return jsonify({
-                    "message": "Moto reservada com sucesso",
-                    "moto_id": moto_id
-                }), 200
-            except ValueError as e:
-                logger.warning(f"Reservation validation error: {e}")
-                return jsonify({"error": str(e)}), 400
-            except sqlite3.IntegrityError as e:
-                logger.error(f"Database integrity error: {e}")
-                return jsonify({"error": "Database constraint violation"}), 409
-            except sqlite3.Error as e:
-                logger.error(f"Database error reserving moto: {e}", exc_info=True)
-                return jsonify({"error": "Database error"}), 503
-            except Exception as e:
-                logger.error(f"Unexpected error reserving moto: {e}", exc_info=True)
-                return jsonify({"error": "Failed to reserve motorcycle"}), 500
 
-        # ==================== JAVA ENDPOINTS ====================
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+
+                # Atualiza status da moto
+                cursor.execute(
+                    """
+                    UPDATE motos_patio 
+                    SET status = 'em_uso', em_uso_por = ?, ultima_atualizacao = ?
+                    WHERE id = ? AND status = 'disponivel'
+                """,
+                    (usuario_id, datetime.now().isoformat(), moto_id),
+                )
+
+                if cursor.rowcount == 0:
+                    conn.close()
+                    return jsonify({"error": "Moto não disponível"}), 400
+
+                # Registra histórico
+                cursor.execute(
+                    """
+                    INSERT INTO historico_uso (id, moto_id, usuario_id, inicio_uso)
+                    VALUES (?, ?, ?, ?)
+                """,
+                    (
+                        str(uuid.uuid4()),
+                        moto_id,
+                        usuario_id,
+                        datetime.now().isoformat(),
+                    ),
+                )
+
+                conn.commit()
+                conn.close()
+
+                return jsonify(
+                    {"message": "Moto reservada com sucesso", "moto_id": moto_id}
+                )
+
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+        # Java endpoints
         @self.app.route("/api/java/motos/status", methods=["GET"])
         def java_motos_status():
-            """Endpoint para integração com Spring Boot - USA MotoService"""
+            """Endpoint para integração com Spring Boot"""
             try:
-                motos = self.moto_service.get_all_motos()
-                return jsonify(JavaFormatter.format_moto_list(motos)), 200
-            except sqlite3.Error as e:
-                logger.error(f"Database error: {e}", exc_info=True)
-                return jsonify({"success": False, "error": "Database error"}), 503
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id as motoId,
+                        modelo,
+                        placa,
+                        status,
+                        bateria as nivelBateria,
+                        localizacao_x as latitude,
+                        localizacao_y as longitude,
+                        zona,
+                        endereco,
+                        setor,
+                        andar,
+                        vaga,
+                        descricao_localizacao as descricaoLocalizacao,
+                        ultima_atualizacao as ultimaAtualizacao
+                    FROM motos_patio
+                """
+                )
+
+                motos = [dict(row) for row in cursor.fetchall()]
+                conn.close()
+
+                # Formato Java-friendly
+                response = {
+                    "success": True,
+                    "data": {
+                        "motos": motos,
+                        "resumo": {
+                            "total": len(motos),
+                            "disponiveis": len(
+                                [m for m in motos if m["status"] == "disponivel"]
+                            ),
+                            "emUso": len([m for m in motos if m["status"] == "em_uso"]),
+                            "manutencao": len(
+                                [m for m in motos if m["status"] == "manutencao"]
+                            ),
+                        },
+                    },
+                    "timestamp": datetime.now().isoformat(),
+                }
+
+                return jsonify(response)
+
             except Exception as e:
-                logger.error(f"Unexpected error: {e}", exc_info=True)
-                return jsonify({"success": False, "error": "Internal server error"}), 500
+                return jsonify({"success": False, "error": str(e)}), 500
 
         @self.app.route("/api/java/motos/buscar/<placa>", methods=["GET"])
         def java_buscar_moto_por_placa(placa):
-            """Busca moto por placa - USA MotoService (SEM DUPLICAÇÃO)"""
+            """Busca moto específica por placa - Endpoint Java/Spring Boot"""
             try:
-                moto = self.moto_service.find_by_placa(placa)
-                
+                conn = sqlite3.connect(self.db_path)
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT 
+                        id as motoId,
+                        modelo,
+                        placa,
+                        status,
+                        bateria as nivelBateria,
+                        localizacao_x as latitude,
+                        localizacao_y as longitude,
+                        zona,
+                        endereco,
+                        setor,
+                        andar,
+                        vaga,
+                        descricao_localizacao as descricaoLocalizacao,
+                        ultima_atualizacao as ultimaAtualizacao,
+                        em_uso_por as emUsoPor
+                    FROM motos_patio 
+                    WHERE placa = ? COLLATE NOCASE
+                """,
+                    (placa,),
+                )
+
+                moto = cursor.fetchone()
+                conn.close()
+
                 if not moto:
                     return jsonify({
                         "success": False,
                         "error": f"Moto com placa {placa} não encontrada",
-                        "timestamp": datetime.now(timezone.utc).isoformat()
+                        "timestamp": datetime.now().isoformat()
                     }), 404
+
+                moto_dict = dict(moto)
                 
-                return jsonify(JavaFormatter.format_moto_detail(moto)), 200
-            except sqlite3.Error as e:
-                logger.error(f"Database error: {e}", exc_info=True)
-                return jsonify({"success": False, "error": "Database error"}), 503
+                # Adiciona localização formatada para Java
+                moto_dict["localizacaoCompleta"] = {
+                    "endereco": moto_dict["endereco"],
+                    "setor": moto_dict["setor"],
+                    "andar": moto_dict["andar"],
+                    "vaga": moto_dict["vaga"],
+                    "descricao": moto_dict["descricaoLocalizacao"],
+                    "coordenadas": {
+                        "latitude": moto_dict["latitude"],
+                        "longitude": moto_dict["longitude"]
+                    },
+                    "zona": moto_dict["zona"]
+                }
+
+                # Instruções de localização
+                moto_dict["instrucoesLocalizacao"] = [
+                    f"Endereço: {moto_dict['endereco']}",
+                    f"Setor: {moto_dict['setor']} - {moto_dict['andar']}º andar",
+                    f"Vaga: {moto_dict['vaga']}",
+                    f"Referência: {moto_dict['descricaoLocalizacao']}"
+                ]
+
+                return jsonify({
+                    "success": True,
+                    "data": {
+                        "moto": moto_dict,
+                        "encontrada": True
+                    },
+                    "timestamp": datetime.now().isoformat()
+                })
+
             except Exception as e:
-                logger.error(f"Unexpected error: {e}", exc_info=True)
-                return jsonify({"success": False, "error": "Internal server error"}), 500
+                return jsonify({"success": False, "error": str(e)}), 500
 
         @self.app.route("/api/java/alertas", methods=["GET", "POST"])
         def java_alertas():
@@ -849,8 +990,8 @@ class VisionMotoIntegrationAPI:
                 # Estatísticas gerais
                 stats = {}
 
-                # Contagem de tabelas com validação
-                ALLOWED_TABLES = [
+                # Contagem de tabelas
+                tables = [
                     "motos_patio",
                     "usuarios",
                     "alertas",
@@ -858,13 +999,7 @@ class VisionMotoIntegrationAPI:
                     "historico_uso",
                     "detections",
                 ]
-                for table in ALLOWED_TABLES:
-                    # Valida nome da tabela antes de usar em query
-                    if not self._validate_table_name(table):
-                        logger.error(f"Invalid table name attempted: {table}")
-                        continue
-                    
-                    # Agora é seguro usar f-string pois validamos
+                for table in tables:
                     cursor.execute(f"SELECT COUNT(*) FROM {table}")
                     stats[f"{table}_count"] = cursor.fetchone()[0]
 
@@ -1021,21 +1156,8 @@ class VisionMotoIntegrationAPI:
         def mobile_alertas_list():
             try:
                 status = request.args.get("status", "OPEN").upper()
-                
-                # Validação de paginação
-                try:
-                    limit = int(request.args.get("limit", 50))
-                    offset = int(request.args.get("offset", 0))
-                    
-                    # Limita valores para prevenir DoS
-                    limit = max(1, min(limit, 100))  # Entre 1 e 100
-                    offset = max(0, offset)  # Mínimo 0
-                except (ValueError, TypeError):
-                    return jsonify({"error": "Invalid pagination parameters"}), 400
-                
-                # Valida status
-                if status not in ["OPEN", "RESOLVED", "ALL"]:
-                    return jsonify({"error": "Invalid status. Use OPEN, RESOLVED, or ALL"}), 400
+                limit = int(request.args.get("limit", 50))
+                offset = int(request.args.get("offset", 0))
 
                 conn = sqlite3.connect(self.db_path)
                 conn.row_factory = sqlite3.Row

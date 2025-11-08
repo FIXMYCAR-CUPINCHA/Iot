@@ -205,6 +205,38 @@ td {
 .status-online { background: #4caf50; }
 .status-offline { background: #f44336; }
 
+/* Mapa Visual do Pátio */
+.patio-map-section {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.patio-map-section h3 {
+    color: #9fb0ff;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    font-weight: 500;
+}
+
+.patio-map-container {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#patio-canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    cursor: default;
+}
+
 @media (max-width: 768px) {
     .content-grid {
         grid-template-columns: 1fr;
@@ -216,5 +248,9 @@ td {
     
     .header h1 {
         font-size: 1.8rem;
+    }
+    
+    .patio-map-section {
+        padding: 15px;
     }
 }
